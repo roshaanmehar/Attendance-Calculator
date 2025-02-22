@@ -42,7 +42,7 @@
     <ol>
       <li>
         <strong>Clone the Repository:</strong>
-        <pre><code>git clone https://github.com/your-username/attendance-calculator.git
+        <pre><code>git clone https://github.com/roshaanmehar/Attendance-Calculator.git
 cd attendance-calculator</code></pre>
       </li>
       <li>
@@ -108,12 +108,12 @@ cd attendance-calculator</code></pre>
     </ul>
     <h3>UI</h3>
     <p>This is how the User Interface of the application looks like. Among these pictures, there is also a past iteration of the code as well. </p>
-    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20190107.png" width="500">
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210731.png" width="500">
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210746.png" width="500">
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210757.png" width="500">
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210832.png" width="500">
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210855.png" width="500">
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20190107.png" width="500">
     <h2 id="future-improvements">Future Improvements</h2>
     <ul>
       <li><strong>Enhanced Input Validation:</strong> Improve validation and error handling for edge cases.</li>
@@ -126,8 +126,8 @@ cd attendance-calculator</code></pre>
     <h2 id="contact">Contact</h2>
     <p>For feedback, suggestions, or any inquiries, feel free to reach out:</p>
     <ul>
-      <li><strong>Email:</strong> <a href="mailto:your.email@example.com">your.email@example.com</a></li>
-      <li><strong>GitHub Issues:</strong> Open an issue on the <a href="https://github.com/your-username/attendance-calculator/issues" target="_blank">GitHub repository</a>.</li>
+      <li><strong>Email:</strong> <a href="mailto:roshaanalimeher@gmail.com">your.email@example.com</a></li>
+      <li><strong>GitHub Issues:</strong> Open an issue on the <a href="https://github.com/roshaanmehar/Attendance-Calculator/issues" target="_blank">GitHub repository</a>.</li>
     </ul>
     <h2 id="license">License</h2>
     <p>This project is licensed under the MIT License. See the <code>LICENSE</code> file for details.</p>
