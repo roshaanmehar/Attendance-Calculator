@@ -109,53 +109,17 @@ function calcSkipAllowed(total: number, requiredPct: number) {
   return allowed < 0 ? 0 : allowed
 }
 
-/** Returns which month you get if you are in `week`. E.g. weeks 1-4 => month=1, 5-8 => month=2, etc. */
-function monthFromWeek(week: number) {
-  return Math.ceil(week / 4)
-}
-
-/** 
- * Returns the valid range of weeks for a given month. 
- *   - Month 1 => weeks [1..4]
- *   - Month 2 => weeks [5..8]
- *   - etc.
- */
-function validWeekRangeForMonth(m: number) {
-  const start = (m - 1) * 4 + 1
-  const end = m * 4
-  return { start, end }
-}
-
-/**
- * Sync the week/month values so that changing one automatically updates the other.
- * If a contradiction arises, clamp or revert the invalid input and generate an alert.
- */
-function syncWeekMonth(
-  week: number,
-  month: number,
-  changedField: "week" | "month"
-) {
-  let newWeek = week
-  let newMonth = month
-  let alertMsg = ""
-
-  if (changedField === "week") {
-    // Recompute month from the chosen week
-    const recalculatedMonth = monthFromWeek(week)
-    if (recalculatedMonth !== month) {
-      newMonth = recalculatedMonth
-      alertMsg = `Changing Week to ${week} changed Month to ${newMonth}.`
-    }
-  } else if (changedField === "month") {
-    // Clamp the week to the month’s valid range
-    const { start, end } = validWeekRangeForMonth(month)
-    if (week < start || week > end) {
-      newWeek = start
-      alertMsg = `Week ${week} is invalid for Month ${month}. Clamping Week to ${start}.`
+/** Sums the first `n` days from Monday→Saturday (0..5), given the daily schedule. */
+function sumFirstNDays(schedule: Record<string, number>, days: number) {
+  // We'll store them in an array in Mon->Sat order
+  const dayKeys = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+  let sum = 0
+  for (let i = 0; i < days; i++) {
+    if (i < dayKeys.length) {
+      sum += schedule[dayKeys[i]] ?? 0
     }
   }
-
-  return { newWeek, newMonth, alertMsg }
+  return sum
 }
 
 export default function AttendanceCalculator() {
@@ -182,89 +146,38 @@ export default function AttendanceCalculator() {
   const [monthTotal, setMonthTotal] = useState(0)
   const [termTotal, setTermTotal] = useState(0)
 
-  // ---------------------------------
-  //  Week + Month synergy (no "day")
-  // ---------------------------------
-  const [numericWeek, setNumericWeek] = useState(1)   // internal numeric
-  const [numericMonth, setNumericMonth] = useState(1) // internal numeric
-  const [lastChanged, setLastChanged] = useState<"week" | "month" | "">("")
-  const [alertMessage, setAlertMessage] = useState("")
-
-  // Keep string-based states for the user inputs
-  const [weekNumber, setWeekNumber] = useState("1")
-  const [monthNumber, setMonthNumber] = useState("1")
-
-  // Each time the user changes a numeric state, do the sync check
-  useEffect(() => {
-    if (!lastChanged) return
-    const { newWeek, newMonth, alertMsg } = syncWeekMonth(
-      numericWeek,
-      numericMonth,
-      lastChanged
-    )
-    if (newWeek !== numericWeek || newMonth !== numericMonth) {
-      setNumericWeek(newWeek)
-      setNumericMonth(newMonth)
-      if (alertMsg) {
-        setAlertMessage(alertMsg)
-      }
-    } else {
-      if (alertMsg) setAlertMessage(alertMsg)
-      else setAlertMessage("")
-    }
-  }, [numericWeek, numericMonth, lastChanged])
-
-  // Whenever numeric states finalize, push back to string fields
-  useEffect(() => {
-    setWeekNumber(String(numericWeek))
-    setMonthNumber(String(numericMonth))
-  }, [numericWeek, numericMonth])
-
-  // ====== Week Info ======
-  const [weekAttendanceStr, setWeekAttendanceStr] = useState("0") // typed % string
-  const [weekPct, setWeekPct] = useState(0)
-  const [weekAttendedCalc, setWeekAttendedCalc] = useState(0)
-  const [weekMissedCalc, setWeekMissedCalc] = useState(0)
-
   // ====== Month Info ======
-  const [monthAttendanceStr, setMonthAttendanceStr] = useState("0")
-  const [monthPct, setMonthPct] = useState(0)
+  const [monthNumber, setMonthNumber] = useState("1")
+  const [monthWeeksPassed, setMonthWeeksPassed] = useState("3")
+  const [monthDaysPassed, setMonthDaysPassed] = useState("0")
+
+  // The user’s typed monthly attendance % => numeric monthPct
+  const [monthAttendanceStr, setMonthAttendanceStr] = useState("85")
+  const [monthPct, setMonthPct] = useState(85)
   const [monthAttendedCalc, setMonthAttendedCalc] = useState(0)
   const [monthMissedCalc, setMonthMissedCalc] = useState(0)
 
   // ====== Term Info ======
-  const [termAttStr, setTermAttStr] = useState("0") // typed % string
+  const [termMonthsPassed, setTermMonthsPassed] = useState("0")
+  const [termWeeksPassed, setTermWeeksPassed] = useState("0")
+  const [termDaysPassed, setTermDaysPassed] = useState("0")
+  // The user’s typed term attendance
+  const [termAttStr, setTermAttStr] = useState("0")
   const [termPct, setTermPct] = useState(0)
   const [termAttendedCalc, setTermAttendedCalc] = useState(0)
   const [termMissedCalc, setTermMissedCalc] = useState(0)
-  const [termWeeksPassed, setTermWeeksPassed] = useState("0") // reference
-  const [termDaysPassed, setTermDaysPassed] = useState("0")  // reference
 
-  /* ==================== Compute Weekly / Monthly / Term from daily schedule ===================== */
+  /* ==================== Compute Weekly / Monthly / Term totals from daily schedule ===================== */
   useEffect(() => {
     const sumDaily = Object.values(schedule).reduce((a, b) => a + b, 0)
-    setWeekTotal(sumDaily)
+    setWeekTotal(sumDaily)          // total lectures in a single full week
     const monthly = sumDaily * 4
-    setMonthTotal(monthly)
-    setTermTotal(monthly * monthsInTerm)
+    setMonthTotal(monthly)          // total lectures in a full month (4 weeks)
+    setTermTotal(monthly * monthsInTerm) // if we had a full term
   }, [schedule, monthsInTerm])
 
-  /* ==================== Week Calculation ==================== */
-  useEffect(() => {
-    const val = parseFloat(weekAttendanceStr)
-    if (!isNaN(val)) {
-      const clamped = Math.min(Math.max(val, 0), 100)
-      setWeekPct(clamped)
-    }
-  }, [weekAttendanceStr])
-
-  useEffect(() => {
-    const { attended, missed } = computeFromPct(weekTotal, weekPct)
-    setWeekAttendedCalc(attended)
-    setWeekMissedCalc(missed)
-  }, [weekPct, weekTotal])
-
-  /* ==================== Month Calculation ==================== */
+  /* ==================== Monthly Calculation ==================== */
+  // Whenever the user changes the typed monthly attendance string => parse & clamp
   useEffect(() => {
     const val = parseFloat(monthAttendanceStr)
     if (!isNaN(val)) {
@@ -273,13 +186,21 @@ export default function AttendanceCalculator() {
     }
   }, [monthAttendanceStr])
 
+  // Recalculate partial monthly total => then attended, missed
   useEffect(() => {
-    const { attended, missed } = computeFromPct(monthTotal, monthPct)
+    // partialMonthTotal = (weeks passed × weeklyTotal) + sumFirstNDays( schedule, daysPassed )
+    const wPassed = parseIntOrZero(monthWeeksPassed)
+    const dPassed = parseIntOrZero(monthDaysPassed)
+
+    const partialMonthTotal = wPassed * weekTotal + sumFirstNDays(schedule, dPassed)
+    const { attended, missed } = computeFromPct(partialMonthTotal, monthPct)
+
     setMonthAttendedCalc(attended)
     setMonthMissedCalc(missed)
-  }, [monthPct, monthTotal])
+  }, [monthWeeksPassed, monthDaysPassed, monthPct, weekTotal, schedule])
 
   /* ==================== Term Calculation ==================== */
+  // Whenever the user changes the typed term attendance string => parse & clamp
   useEffect(() => {
     const val = parseFloat(termAttStr)
     if (!isNaN(val)) {
@@ -288,11 +209,24 @@ export default function AttendanceCalculator() {
     }
   }, [termAttStr])
 
+  // Recompute partialTermTotal => then attended, missed
   useEffect(() => {
-    const { attended, missed } = computeFromPct(termTotal, termPct)
+    // partialTermTotal = (months fully passed × monthTotal) + (termWeeksPassed × weekTotal) + sumFirstNDays(schedule, termDaysPassed)
+    const mPassed = parseIntOrZero(termMonthsPassed)
+    const wPassed = parseIntOrZero(termWeeksPassed)
+    const dPassed = parseIntOrZero(termDaysPassed)
+
+    // full months done:
+    const fullMonthsLectures = mPassed * monthTotal
+    // partial next month (weeks + days)
+    const partialFromWeeks = wPassed * weekTotal
+    const partialFromDays = sumFirstNDays(schedule, dPassed)
+    const partialTermTotal = fullMonthsLectures + partialFromWeeks + partialFromDays
+
+    const { attended, missed } = computeFromPct(partialTermTotal, termPct)
     setTermAttendedCalc(attended)
     setTermMissedCalc(missed)
-  }, [termPct, termTotal])
+  }, [termMonthsPassed, termWeeksPassed, termDaysPassed, termPct, monthTotal, weekTotal, schedule])
 
   // Container + card classes for theming
   const containerClass = inverted
@@ -333,16 +267,7 @@ export default function AttendanceCalculator() {
           </div>
         </div>
 
-        {/* If we have an alert message, display it */}
-        {alertMessage && (
-          <div className="mb-4">
-            <Alert className="bg-red-200 border border-red-300 text-red-900">
-              <AlertDescription>{alertMessage}</AlertDescription>
-            </Alert>
-          </div>
-        )}
-
-        {/* Required attendance + monthsInTerm */}
+        {/* Global Settings */}
         <Card className={`max-w-4xl mx-auto mb-6 ${cardClass}`}>
           <CardHeader>
             <CardTitle className="text-xl">Global Settings</CardTitle>
@@ -361,8 +286,7 @@ export default function AttendanceCalculator() {
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>
-                        If actual attendance is below this number, we show red;
-                        otherwise green.
+                        If actual attendance is below this number, we color the bar red; else green.
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -388,8 +312,7 @@ export default function AttendanceCalculator() {
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>
-                        Used to compute <strong>term total</strong> = monthTotal
-                        × monthsInTerm.
+                        Used to figure out a <strong>full</strong> term total = monthTotal × monthsInTerm.
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -405,7 +328,7 @@ export default function AttendanceCalculator() {
           </CardContent>
         </Card>
 
-        {/* Daily schedule -> week, month, term totals */}
+        {/* Daily schedule -> for weekly, monthly, and partial calculations */}
         <Card className={`max-w-4xl mx-auto mb-6 ${cardClass}`}>
           <CardHeader>
             <CardTitle className="text-xl">Daily Schedule (Mon–Sat)</CardTitle>
@@ -426,10 +349,7 @@ export default function AttendanceCalculator() {
                     value={val}
                     onChange={(e) => {
                       const newVal = parseIntOrZero(e.target.value)
-                      setSchedule((prev) => ({
-                        ...prev,
-                        [day]: newVal,
-                      }))
+                      setSchedule((prev) => ({ ...prev, [day]: newVal }))
                     }}
                   />
                 </div>
@@ -444,56 +364,9 @@ export default function AttendanceCalculator() {
                 <strong>Monthly Total (4×week):</strong> {monthTotal}
               </p>
               <p>
-                <strong>Term Total:</strong> {termTotal}
+                <strong>Term Total (full):</strong> {termTotal}
               </p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Week portion */}
-        <Card className={`max-w-4xl mx-auto mb-6 ${cardClass}`}>
-          <CardHeader>
-            <CardTitle className="text-xl">Week Attendance</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Week # */}
-              <div className="space-y-1">
-                <Label htmlFor="weekNumber">Week #</Label>
-                <Input
-                  id="weekNumber"
-                  type="text"
-                  value={weekNumber}
-                  onChange={(e) => {
-                    const val = parseIntOrZero(e.target.value)
-                    setWeekNumber(val.toString())
-                    setNumericWeek(val)
-                    setLastChanged("week")
-                  }}
-                />
-              </div>
-
-              {/* Current Attendance % */}
-              <div className="space-y-1">
-                <Label htmlFor="weekAttendanceStr">
-                  Current Weekly Attendance %
-                </Label>
-                <Input
-                  id="weekAttendanceStr"
-                  type="text"
-                  value={weekAttendanceStr}
-                  onChange={(e) => setWeekAttendanceStr(e.target.value)}
-                />
-              </div>
-            </div>
-            <WeekDisplay
-              weekNo={weekNumber}
-              weekTotal={weekTotal}
-              attendancePct={weekPct}
-              attended={weekAttendedCalc}
-              missed={weekMissedCalc}
-              required={requiredAttendance}
-            />
           </CardContent>
         </Card>
 
@@ -503,7 +376,7 @@ export default function AttendanceCalculator() {
             <CardTitle className="text-xl">Month Attendance</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Month # */}
               <div className="space-y-1">
                 <Label htmlFor="monthNumber">Month #</Label>
@@ -511,15 +384,33 @@ export default function AttendanceCalculator() {
                   id="monthNumber"
                   type="text"
                   value={monthNumber}
-                  onChange={(e) => {
-                    const val = parseIntOrZero(e.target.value)
-                    setMonthNumber(val.toString())
-                    setNumericMonth(val)
-                    setLastChanged("month")
-                  }}
+                  onChange={(e) => setMonthNumber(e.target.value)}
                 />
               </div>
 
+              {/* Weeks Passed in Current Month */}
+              <div className="space-y-1">
+                <Label htmlFor="monthWeeksPassed">Weeks Passed</Label>
+                <Input
+                  id="monthWeeksPassed"
+                  type="text"
+                  value={monthWeeksPassed}
+                  onChange={(e) => setMonthWeeksPassed(e.target.value)}
+                />
+              </div>
+
+              {/* Days Passed in Partial Next Week */}
+              <div className="space-y-1">
+                <Label htmlFor="monthDaysPassed">Days Passed</Label>
+                <Input
+                  id="monthDaysPassed"
+                  type="text"
+                  value={monthDaysPassed}
+                  onChange={(e) => setMonthDaysPassed(e.target.value)}
+                />
+              </div>
+
+              {/* Current Monthly Attendance % */}
               <div className="space-y-1">
                 <Label htmlFor="monthAttendanceStr">
                   Current Monthly Attendance %
@@ -532,9 +423,9 @@ export default function AttendanceCalculator() {
                 />
               </div>
             </div>
+
             <MonthDisplay
               monthNo={monthNumber}
-              monthTotal={monthTotal}
               attendancePct={monthPct}
               attended={monthAttendedCalc}
               missed={monthMissedCalc}
@@ -543,33 +434,48 @@ export default function AttendanceCalculator() {
           </CardContent>
         </Card>
 
-        {/* Term portion */}
+        {/* Term portion (optional) */}
         <Card className={`max-w-4xl mx-auto mb-6 ${cardClass}`}>
           <CardHeader>
             <CardTitle className="text-xl">Term Attendance</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <p className="text-sm text-gray-600">
+              This section is optional if you want a broader “Term” calculation.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-1">
-                <Label>Weeks Passed (info only)</Label>
+                <Label htmlFor="termMonthsPassed">Months Passed</Label>
                 <Input
+                  id="termMonthsPassed"
+                  type="text"
+                  value={termMonthsPassed}
+                  onChange={(e) => setTermMonthsPassed(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="termWeeksPassed">Weeks Passed</Label>
+                <Input
+                  id="termWeeksPassed"
                   type="text"
                   value={termWeeksPassed}
                   onChange={(e) => setTermWeeksPassed(e.target.value)}
                 />
               </div>
+
               <div className="space-y-1">
-                <Label>Days Passed (info only)</Label>
+                <Label htmlFor="termDaysPassed">Days Passed</Label>
                 <Input
+                  id="termDaysPassed"
                   type="text"
                   value={termDaysPassed}
                   onChange={(e) => setTermDaysPassed(e.target.value)}
                 />
               </div>
+
               <div className="space-y-1">
-                <Label htmlFor="termAttStr">
-                  Current Term Attendance %
-                </Label>
+                <Label htmlFor="termAttStr">Current Term Attendance %</Label>
                 <Input
                   id="termAttStr"
                   type="text"
@@ -580,12 +486,9 @@ export default function AttendanceCalculator() {
             </div>
             <TermDisplay
               termPct={termPct}
-              termTotal={termTotal}
               attended={termAttendedCalc}
               missed={termMissedCalc}
               required={requiredAttendance}
-              weeksPassed={termWeeksPassed}
-              daysPassed={termDaysPassed}
             />
           </CardContent>
         </Card>
@@ -594,71 +497,15 @@ export default function AttendanceCalculator() {
   )
 }
 
-/* ================== Week Display ================== */
-function WeekDisplay({
-  weekNo,
-  weekTotal,
-  attendancePct,
-  attended,
-  missed,
-  required,
-}: {
-  weekNo: string
-  weekTotal: number
-  attendancePct: number
-  attended: number
-  missed: number
-  required: number
-}) {
-  const below = attendancePct < required
-  const barColor = below ? "bg-red-500" : "bg-green-500"
-  const widthStr = `${Math.min(attendancePct, 100).toFixed(2)}%`
-
-  const skipAllowed = calcSkipAllowed(weekTotal, required)
-
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={`week-${attendancePct}`}
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        transition={{ duration: 0.2 }}
-      >
-        <Alert className="flex flex-col gap-2">
-          <AlertDescription>
-            <strong>Week {weekNo} Attendance:</strong> {attendancePct.toFixed(2)}%
-            <br />
-            <span>Out of {weekTotal} total lectures:</span> Attended {attended} | Missed {missed}
-            <br />
-            You can still skip up to <strong>{skipAllowed}</strong> lecture(s) this week
-            and remain ≥ {required}%.
-          </AlertDescription>
-          <div className="w-full h-3 bg-gray-300 rounded">
-            <motion.div
-              className={`h-full rounded ${barColor}`}
-              initial={{ width: 0 }}
-              animate={{ width: widthStr }}
-              transition={{ duration: 0.5 }}
-            />
-          </div>
-        </Alert>
-      </motion.div>
-    </AnimatePresence>
-  )
-}
-
-/* ================== Month Display ================== */
+/* ================== Month Display (Attended, Missed, etc.) ================== */
 function MonthDisplay({
   monthNo,
-  monthTotal,
   attendancePct,
   attended,
   missed,
   required,
 }: {
   monthNo: string
-  monthTotal: number
   attendancePct: number
   attended: number
   missed: number
@@ -667,8 +514,6 @@ function MonthDisplay({
   const below = attendancePct < required
   const barColor = below ? "bg-red-500" : "bg-green-500"
   const widthStr = `${Math.min(attendancePct, 100).toFixed(2)}%`
-
-  const skipAllowed = calcSkipAllowed(monthTotal, required)
 
   return (
     <AnimatePresence mode="wait">
@@ -681,12 +526,10 @@ function MonthDisplay({
       >
         <Alert className="flex flex-col gap-2">
           <AlertDescription>
-            <strong>Month {monthNo} Attendance:</strong> {attendancePct.toFixed(2)}%
+            <strong>Month {monthNo} Attendance:</strong>{" "}
+            {attendancePct.toFixed(2)}%
             <br />
-            <span>Out of {monthTotal} total lectures:</span> Attended {attended} | Missed {missed}
-            <br />
-            You can skip up to <strong>{skipAllowed}</strong> lecture(s) this month
-            and still remain ≥ {required}%.
+            <span>Attended {attended} | Missed {missed}</span>
           </AlertDescription>
           <div className="w-full h-3 bg-gray-300 rounded">
             <motion.div
@@ -702,29 +545,21 @@ function MonthDisplay({
   )
 }
 
-/* ================== Term Display ================== */
+/* ================== Term Display (Attended, Missed, etc.) ================== */
 function TermDisplay({
   termPct,
-  termTotal,
   attended,
   missed,
   required,
-  weeksPassed,
-  daysPassed,
 }: {
   termPct: number
-  termTotal: number
   attended: number
   missed: number
   required: number
-  weeksPassed: string
-  daysPassed: string
 }) {
   const below = termPct < required
   const barColor = below ? "bg-red-500" : "bg-green-500"
   const widthStr = `${Math.min(termPct, 100).toFixed(2)}%`
-
-  const skipAllowed = calcSkipAllowed(termTotal, required)
 
   return (
     <AnimatePresence mode="wait">
@@ -739,10 +574,7 @@ function TermDisplay({
           <AlertDescription>
             <strong>Term Attendance:</strong> {termPct.toFixed(2)}%
             <br />
-            <span>Out of {termTotal} total lectures:</span> Attended {attended} | Missed {missed}
-            <br />
-            You can skip up to <strong>{skipAllowed}</strong> lecture(s) this term
-            and remain ≥ {required}%.
+            <span>Attended {attended} | Missed {missed}</span>
           </AlertDescription>
           <div className="w-full h-3 bg-gray-300 rounded">
             <motion.div
@@ -753,10 +585,6 @@ function TermDisplay({
             />
           </div>
         </Alert>
-        <div className="mt-2 text-sm text-gray-600 space-y-1">
-          <p>Weeks passed (info): {weeksPassed}</p>
-          <p>Days passed (info): {daysPassed}</p>
-        </div>
       </motion.div>
     </AnimatePresence>
   )
