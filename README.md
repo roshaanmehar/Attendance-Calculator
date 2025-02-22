@@ -126,7 +126,7 @@ cd attendance-calculator</code></pre>
     <h2 id="contact">Contact</h2>
     <p>For feedback, suggestions, or any inquiries, feel free to reach out:</p>
     <ul>
-      <li><strong>Email:</strong> <a href="mailto:roshaanalimeher@gmail.com">your.email@example.com</a></li>
+      <li><strong>Email:</strong> <a href="mailto:roshaanalimeher@gmail.com">roshaanalimeher@gmail.com</a></li>
       <li><strong>GitHub Issues:</strong> Open an issue on the <a href="https://github.com/roshaanmehar/Attendance-Calculator/issues" target="_blank">GitHub repository</a>.</li>
     </ul>
     <h2 id="license">License</h2>
