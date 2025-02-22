@@ -3,51 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Attendance Calculator</title>
-  <style>
-    /* Basic styling */
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      margin: 0;
-      padding: 20px;
-      background-color: #f5f5f5;
-    }
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-      background: #fff;
-      padding: 20px;
-    }
-    h1, h2, h3 {
-      color: #333;
-    }
-    pre {
-      background: #eee;
-      padding: 10px;
-      overflow-x: auto;
-    }
-    code {
-      background: #eee;
-      padding: 2px 4px;
-      border-radius: 4px;
-    }
-    a {
-      color: #007BFF;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-    hr {
-      border: none;
-      border-top: 1px solid #ddd;
-      margin: 20px 0;
-    }
-    ul, ol {
-      margin-left: 20px;
-    }
-  </style>
+ 
 </head>
 <body>
   <div class="container">
@@ -150,6 +106,14 @@ cd attendance-calculator</code></pre>
     <ul>
       <li><strong>MonthDisplay &amp; TermDisplay:</strong> Use Framer Motion to animate progress bars and alerts, providing visual feedback on attendance performance.</li>
     </ul>
+    <h3>UI</h3>
+    <p>This is how the User Interface of the application looks like. Among these pictures, there is also a past iteration of the code as well. </p>
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20190107.png" width="500">
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210731.png" width="500">
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210746.png" width="500">
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210757.png" width="500">
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210832.png" width="500">
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210855.png" width="500">
     <h2 id="future-improvements">Future Improvements</h2>
     <ul>
       <li><strong>Enhanced Input Validation:</strong> Improve validation and error handling for edge cases.</li>
