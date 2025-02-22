@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
-// ShadCN/UI components
+// Shadcn/UI components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -25,14 +25,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-// A nicer switch for "Invert Colors" would be from shadcn's Switch component,
-// but here's a basic checkbox to keep dependencies minimal.
+// Simple "Invert" checkbox
 function InvertToggle({
   inverted,
   onChange,
 }: {
   inverted: boolean
-  onChange: (value: boolean) => void
+  onChange: (val: boolean) => void
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -48,46 +47,58 @@ function InvertToggle({
   )
 }
 
-// Theme definitions: each theme has "normal" (light) and "invert" (dark)
+/**
+ * Each theme gets two sets of classes:
+ * - containerNormal / containerInvert => outer page background
+ * - cardNormal / cardInvert => card background
+ */
 const themeMap = {
-  zinc: {
-    normal: "bg-zinc-100 text-zinc-900",
-    invert: "bg-zinc-900 text-zinc-100",
-  },
   rose: {
-    normal: "bg-rose-100 text-rose-900",
-    invert: "bg-rose-900 text-rose-100",
+    containerNormal: "bg-rose-50 text-rose-900",
+    containerInvert: "bg-rose-900 text-rose-50",
+    cardNormal: "bg-rose-100 border border-rose-200 text-rose-900",
+    cardInvert: "bg-rose-800 border border-rose-600 text-rose-100",
+  },
+  zinc: {
+    containerNormal: "bg-zinc-50 text-zinc-900",
+    containerInvert: "bg-zinc-900 text-zinc-50",
+    cardNormal: "bg-zinc-100 border border-zinc-200 text-zinc-900",
+    cardInvert: "bg-zinc-800 border border-zinc-600 text-zinc-100",
   },
   blue: {
-    normal: "bg-blue-100 text-blue-900",
-    invert: "bg-blue-900 text-blue-100",
+    containerNormal: "bg-blue-50 text-blue-900",
+    containerInvert: "bg-blue-900 text-blue-50",
+    cardNormal: "bg-blue-100 border border-blue-200 text-blue-900",
+    cardInvert: "bg-blue-800 border border-blue-600 text-blue-100",
   },
   green: {
-    normal: "bg-green-100 text-green-900",
-    invert: "bg-green-900 text-green-100",
+    containerNormal: "bg-green-50 text-green-900",
+    containerInvert: "bg-green-900 text-green-50",
+    cardNormal: "bg-green-100 border border-green-200 text-green-900",
+    cardInvert: "bg-green-800 border border-green-600 text-green-100",
   },
   purple: {
-    normal: "bg-purple-100 text-purple-900",
-    invert: "bg-purple-900 text-purple-100",
+    containerNormal: "bg-purple-50 text-purple-900",
+    containerInvert: "bg-purple-900 text-purple-50",
+    cardNormal: "bg-purple-100 border border-purple-200 text-purple-900",
+    cardInvert: "bg-purple-800 border border-purple-600 text-purple-100",
   },
 }
 
-// Helper to parse integer from text; empty -> 0; negative -> clamp at 0
-function parseIntOrZero(str: string) {
-  const parsed = parseInt(str, 10)
+function parseIntOrZero(val: string) {
+  const parsed = parseInt(val, 10)
   if (isNaN(parsed) || parsed < 0) return 0
   return parsed
 }
 
-// Helper to parse attendance percentage
 function parseFloatClamped(str: string, min = 0, max = 100) {
   const parsed = parseFloat(str)
   if (isNaN(parsed)) return min
-  return Math.max(min, Math.min(max, parsed))
+  return Math.min(Math.max(parsed, min), max)
 }
 
 export default function AttendanceCalculator() {
-  // Basic states
+  // State
   const [schedule, setSchedule] = useState({
     Monday: 3,
     Tuesday: 2,
@@ -98,11 +109,10 @@ export default function AttendanceCalculator() {
   const [currentWeek, setCurrentWeek] = useState(1)
   const [monthsInTerm, setMonthsInTerm] = useState(4)
   const [attendedLectures, setAttendedLectures] = useState(0)
-  const [currentAttendancePercentage, setCurrentAttendancePercentage] =
-    useState<number>(0)
+  const [currentAttendancePercentage, setCurrentAttendancePercentage] = useState(0)
 
-  // Theming states
-  const [theme, setTheme] = useState<keyof typeof themeMap>("zinc")
+  // Theming
+  const [theme, setTheme] = useState<keyof typeof themeMap>("rose")
   const [inverted, setInverted] = useState(false)
 
   // Computed results
@@ -117,23 +127,15 @@ export default function AttendanceCalculator() {
 
   const REQUIRED_PERCENTAGE = 85
   const WEEKS_IN_MONTH = 4
-  const WEEKS_IN_TERM = useMemo(
-    () => monthsInTerm * WEEKS_IN_MONTH,
-    [monthsInTerm]
-  )
+  const WEEKS_IN_TERM = useMemo(() => monthsInTerm * WEEKS_IN_MONTH, [monthsInTerm])
 
-  // Recompute results whenever inputs change
+  // Recalculate results
   useEffect(() => {
-    const totalLecturesPerWeek = Object.values(schedule).reduce(
-      (a, b) => a + b,
-      0
-    )
+    const totalLecturesPerWeek = Object.values(schedule).reduce((a, b) => a + b, 0)
     const totalPossibleLectures = currentWeek * totalLecturesPerWeek
     const totalTermLectures = WEEKS_IN_TERM * totalLecturesPerWeek
 
-    const requiredForWeek = Math.ceil(
-      (REQUIRED_PERCENTAGE / 100) * totalLecturesPerWeek
-    )
+    const requiredForWeek = Math.ceil((REQUIRED_PERCENTAGE / 100) * totalLecturesPerWeek)
 
     // monthly
     const totalLecturesInMonth = WEEKS_IN_MONTH * totalLecturesPerWeek
@@ -149,13 +151,13 @@ export default function AttendanceCalculator() {
     )
     const requiredForTerm = Math.max(0, rawRequiredForTerm)
 
-    // Current attendance
+    // percentage
     const currentPercentage =
       totalPossibleLectures === 0
         ? 0
         : (attendedLectures / totalPossibleLectures) * 100
 
-    // Missable
+    // missable
     const minimumRequired = Math.ceil(
       (REQUIRED_PERCENTAGE / 100) * totalTermLectures
     )
@@ -175,7 +177,7 @@ export default function AttendanceCalculator() {
     })
   }, [schedule, currentWeek, attendedLectures, WEEKS_IN_TERM])
 
-  // Keep the numeric percentage in sync
+  // Sync numeric attendance percentage
   useEffect(() => {
     const totalPossibleLectures = results.totalPerWeek * currentWeek
     if (totalPossibleLectures > 0) {
@@ -187,35 +189,38 @@ export default function AttendanceCalculator() {
     }
   }, [attendedLectures, currentWeek, results.totalPerWeek])
 
-  // Called when user types a new attendance percentage
+  // Called when user types a new attendance %
   const handleAttendanceChange = (val: string) => {
     const newPercent = parseFloatClamped(val)
     setCurrentAttendancePercentage(newPercent)
+
+    // Recompute how many lectures from that percentage
     const totalPossibleLectures = results.totalPerWeek * currentWeek
-    const calculatedAttended = Math.round((newPercent / 100) * totalPossibleLectures)
-    setAttendedLectures(calculatedAttended)
+    const attended = Math.round((newPercent / 100) * totalPossibleLectures)
+    setAttendedLectures(attended)
   }
 
-  // The final theme classes for the entire page
-  const themeClasses = inverted
-    ? themeMap[theme].invert
-    : themeMap[theme].normal
+  // Compute theme classes for container + card
+  const containerClass = inverted
+    ? themeMap[theme].containerInvert
+    : themeMap[theme].containerNormal
+  const cardClass = inverted
+    ? themeMap[theme].cardInvert
+    : themeMap[theme].cardNormal
 
   return (
     <TooltipProvider>
-      {/* 
-        Full-page container uses the chosen theme.
-        "min-h-screen" ensures it covers the full viewport.
-      */}
-      <div className={`min-h-screen w-full p-4 ${themeClasses}`}>
-        <Card className="max-w-2xl mx-auto">
+      {/* The entire page uses the selected theme variant */}
+      <div className={`min-h-screen w-full p-4 ${containerClass}`}>
+        <Card className={`max-w-2xl mx-auto ${cardClass}`}>
           <CardHeader>
             <CardTitle>Attendance Calculator</CardTitle>
           </CardHeader>
 
           <CardContent className="space-y-6">
-            {/* Theming Controls */}
+            {/* Theme controls */}
             <div className="flex flex-wrap items-center gap-4">
+              {/* Theme dropdown */}
               <div className="flex items-center gap-2">
                 <Label htmlFor="theme">Theme</Label>
                 <Select
@@ -226,8 +231,8 @@ export default function AttendanceCalculator() {
                     <SelectValue placeholder="Select theme" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="zinc">Zinc</SelectItem>
                     <SelectItem value="rose">Rose</SelectItem>
+                    <SelectItem value="zinc">Zinc</SelectItem>
                     <SelectItem value="blue">Blue</SelectItem>
                     <SelectItem value="green">Green</SelectItem>
                     <SelectItem value="purple">Purple</SelectItem>
@@ -235,11 +240,11 @@ export default function AttendanceCalculator() {
                 </Select>
               </div>
 
-              {/* Invert toggle */}
+              {/* Invert */}
               <InvertToggle inverted={inverted} onChange={setInverted} />
             </div>
 
-            {/* Term config */}
+            {/* Months in Term */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label htmlFor="months-in-term">Months in Term</Label>
@@ -271,10 +276,7 @@ export default function AttendanceCalculator() {
                       <HelpCircle className="h-4 w-4" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>
-                        Which week are you on? Max is {WEEKS_IN_TERM} for this
-                        term.
-                      </p>
+                      <p>Which week are you currently in?</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -284,13 +286,12 @@ export default function AttendanceCalculator() {
                   value={currentWeek}
                   onChange={(e) => {
                     const val = parseIntOrZero(e.target.value)
-                    // clamp to not exceed WEEKS_IN_TERM
                     setCurrentWeek(Math.min(val, WEEKS_IN_TERM))
                   }}
                 />
               </div>
 
-              {/* Percentage */}
+              {/* Attendance % */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="current-percentage">
@@ -301,7 +302,7 @@ export default function AttendanceCalculator() {
                       <HelpCircle className="h-4 w-4" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Enter your current attendance percentage (0-100).</p>
+                      <p>Type your current attendance percentage (0-100).</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -331,9 +332,7 @@ export default function AttendanceCalculator() {
                   id="attended"
                   type="number"
                   value={attendedLectures}
-                  onChange={(e) =>
-                    setAttendedLectures(parseIntOrZero(e.target.value))
-                  }
+                  onChange={(e) => setAttendedLectures(parseIntOrZero(e.target.value))}
                 />
               </div>
             </div>
@@ -347,7 +346,7 @@ export default function AttendanceCalculator() {
                     <HelpCircle className="h-4 w-4" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Enter how many lectures occur each weekday.</p>
+                    <p>Number of lectures each weekday.</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -395,7 +394,6 @@ export default function AttendanceCalculator() {
                   <TabsTrigger value="term">Term</TabsTrigger>
                 </TabsList>
 
-                {/* Weekly */}
                 <TabsContent value="week" className="space-y-4">
                   <div className="grid gap-4">
                     <motion.div
@@ -421,16 +419,12 @@ export default function AttendanceCalculator() {
                     >
                       <span>Lectures you can miss this week:</span>
                       <Badge variant="outline">
-                        {Math.max(
-                          0,
-                          results.totalPerWeek - results.requiredForWeek
-                        )}
+                        {Math.max(0, results.totalPerWeek - results.requiredForWeek)}
                       </Badge>
                     </motion.div>
                   </div>
                 </TabsContent>
 
-                {/* Monthly */}
                 <TabsContent value="month" className="space-y-4">
                   <motion.div
                     initial={{ opacity: 0, x: -20 }}
@@ -442,7 +436,6 @@ export default function AttendanceCalculator() {
                   </motion.div>
                 </TabsContent>
 
-                {/* Term */}
                 <TabsContent value="term" className="space-y-4">
                   <div className="space-y-4">
                     <motion.div
