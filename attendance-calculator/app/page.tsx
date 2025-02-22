@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
-// shadcn/ui components
+// ShadCN/UI components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -25,29 +25,69 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-// Toggle (checkbox) for invert
-// You can also import a switch component from shadcn if you like.
+// A nicer switch for "Invert Colors" would be from shadcn's Switch component,
+// but here's a basic checkbox to keep dependencies minimal.
 function InvertToggle({
   inverted,
-  onToggle,
+  onChange,
 }: {
   inverted: boolean
-  onToggle: () => void
+  onChange: (value: boolean) => void
 }) {
   return (
     <div className="flex items-center gap-2">
-      <Label>Invert Colors</Label>
+      <Label htmlFor="invert-toggle">Invert</Label>
       <input
+        id="invert-toggle"
         type="checkbox"
         checked={inverted}
-        onChange={onToggle}
+        onChange={(e) => onChange(e.target.checked)}
         className="h-4 w-4 cursor-pointer"
       />
     </div>
   )
 }
 
+// Theme definitions: each theme has "normal" (light) and "invert" (dark)
+const themeMap = {
+  zinc: {
+    normal: "bg-zinc-100 text-zinc-900",
+    invert: "bg-zinc-900 text-zinc-100",
+  },
+  rose: {
+    normal: "bg-rose-100 text-rose-900",
+    invert: "bg-rose-900 text-rose-100",
+  },
+  blue: {
+    normal: "bg-blue-100 text-blue-900",
+    invert: "bg-blue-900 text-blue-100",
+  },
+  green: {
+    normal: "bg-green-100 text-green-900",
+    invert: "bg-green-900 text-green-100",
+  },
+  purple: {
+    normal: "bg-purple-100 text-purple-900",
+    invert: "bg-purple-900 text-purple-100",
+  },
+}
+
+// Helper to parse integer from text; empty -> 0; negative -> clamp at 0
+function parseIntOrZero(str: string) {
+  const parsed = parseInt(str, 10)
+  if (isNaN(parsed) || parsed < 0) return 0
+  return parsed
+}
+
+// Helper to parse attendance percentage
+function parseFloatClamped(str: string, min = 0, max = 100) {
+  const parsed = parseFloat(str)
+  if (isNaN(parsed)) return min
+  return Math.max(min, Math.min(max, parsed))
+}
+
 export default function AttendanceCalculator() {
+  // Basic states
   const [schedule, setSchedule] = useState({
     Monday: 3,
     Tuesday: 2,
@@ -55,15 +95,14 @@ export default function AttendanceCalculator() {
     Thursday: 4,
     Friday: 2,
   })
-
   const [currentWeek, setCurrentWeek] = useState(1)
   const [monthsInTerm, setMonthsInTerm] = useState(4)
   const [attendedLectures, setAttendedLectures] = useState(0)
   const [currentAttendancePercentage, setCurrentAttendancePercentage] =
     useState<number>(0)
-  const [theme, setTheme] = useState("zinc")
 
-  // NEW: Whether colors are inverted
+  // Theming states
+  const [theme, setTheme] = useState<keyof typeof themeMap>("zinc")
   const [inverted, setInverted] = useState(false)
 
   // Computed results
@@ -83,17 +122,7 @@ export default function AttendanceCalculator() {
     [monthsInTerm]
   )
 
-  // These classes control your accent/outline, etc.
-  // The main container uses theming + an invert toggle for background/text.
-  const themes: Record<string, string> = {
-    zinc: "border-zinc-500 focus:ring-zinc-500",
-    rose: "border-rose-500 focus:ring-rose-500",
-    blue: "border-blue-500 focus:ring-blue-500",
-    green: "border-green-500 focus:ring-green-500",
-    purple: "border-purple-500 focus:ring-purple-500",
-  }
-
-  // Recompute all results whenever inputs change
+  // Recompute results whenever inputs change
   useEffect(() => {
     const totalLecturesPerWeek = Object.values(schedule).reduce(
       (a, b) => a + b,
@@ -102,12 +131,11 @@ export default function AttendanceCalculator() {
     const totalPossibleLectures = currentWeek * totalLecturesPerWeek
     const totalTermLectures = WEEKS_IN_TERM * totalLecturesPerWeek
 
-    // Required for week
     const requiredForWeek = Math.ceil(
       (REQUIRED_PERCENTAGE / 100) * totalLecturesPerWeek
     )
 
-    // Monthly calculations
+    // monthly
     const totalLecturesInMonth = WEEKS_IN_MONTH * totalLecturesPerWeek
     const rawRequiredForMonth = Math.ceil(
       (REQUIRED_PERCENTAGE / 100) * totalLecturesInMonth -
@@ -115,19 +143,19 @@ export default function AttendanceCalculator() {
     )
     const requiredForMonth = Math.max(0, rawRequiredForMonth)
 
-    // Term calculations
+    // term
     const rawRequiredForTerm = Math.ceil(
       (REQUIRED_PERCENTAGE / 100) * totalTermLectures - attendedLectures
     )
     const requiredForTerm = Math.max(0, rawRequiredForTerm)
 
-    // Attendance percentage
+    // Current attendance
     const currentPercentage =
       totalPossibleLectures === 0
         ? 0
         : (attendedLectures / totalPossibleLectures) * 100
 
-    // Missable lectures
+    // Missable
     const minimumRequired = Math.ceil(
       (REQUIRED_PERCENTAGE / 100) * totalTermLectures
     )
@@ -147,9 +175,9 @@ export default function AttendanceCalculator() {
     })
   }, [schedule, currentWeek, attendedLectures, WEEKS_IN_TERM])
 
-  // Keep currentAttendancePercentage in sync
+  // Keep the numeric percentage in sync
   useEffect(() => {
-    const totalPossibleLectures = currentWeek * results.totalPerWeek
+    const totalPossibleLectures = results.totalPerWeek * currentWeek
     if (totalPossibleLectures > 0) {
       setCurrentAttendancePercentage(
         (attendedLectures / totalPossibleLectures) * 100
@@ -159,47 +187,41 @@ export default function AttendanceCalculator() {
     }
   }, [attendedLectures, currentWeek, results.totalPerWeek])
 
-  // Parse integer helper
-  const parseIntValue = (val: string) => {
-    const n = parseInt(val, 10)
-    return isNaN(n) ? 0 : n
-  }
-
-  // For typing attendance percentage directly
+  // Called when user types a new attendance percentage
   const handleAttendanceChange = (val: string) => {
-    const parsed = parseFloat(val)
-    if (isNaN(parsed)) return
-    const percentage = Math.max(0, Math.min(100, parsed))
-    setCurrentAttendancePercentage(percentage)
-    const totalPossibleLectures = currentWeek * results.totalPerWeek
-    const newAttended = Math.round((percentage / 100) * totalPossibleLectures)
-    setAttendedLectures(newAttended)
+    const newPercent = parseFloatClamped(val)
+    setCurrentAttendancePercentage(newPercent)
+    const totalPossibleLectures = results.totalPerWeek * currentWeek
+    const calculatedAttended = Math.round((newPercent / 100) * totalPossibleLectures)
+    setAttendedLectures(calculatedAttended)
   }
 
-  // Container classes:
-  // - Invert toggle => background black + text white (or vice versa)
-  // - Use theme to style borders/outlines
-  const containerClass = `
-    min-h-screen p-4
-    ${inverted ? "bg-black text-white" : "bg-white text-black"}
-    ${themes[theme]}
-  `
+  // The final theme classes for the entire page
+  const themeClasses = inverted
+    ? themeMap[theme].invert
+    : themeMap[theme].normal
 
   return (
     <TooltipProvider>
-      <div className={containerClass}>
-        <Card className="max-w-2xl mx-auto space-y-4">
+      {/* 
+        Full-page container uses the chosen theme.
+        "min-h-screen" ensures it covers the full viewport.
+      */}
+      <div className={`min-h-screen w-full p-4 ${themeClasses}`}>
+        <Card className="max-w-2xl mx-auto">
           <CardHeader>
             <CardTitle>Attendance Calculator</CardTitle>
           </CardHeader>
 
           <CardContent className="space-y-6">
-            {/* Theming controls */}
+            {/* Theming Controls */}
             <div className="flex flex-wrap items-center gap-4">
-              {/* Theme dropdown */}
               <div className="flex items-center gap-2">
                 <Label htmlFor="theme">Theme</Label>
-                <Select value={theme} onValueChange={setTheme}>
+                <Select
+                  value={theme}
+                  onValueChange={(val) => setTheme(val as keyof typeof themeMap)}
+                >
                   <SelectTrigger className="w-32">
                     <SelectValue placeholder="Select theme" />
                   </SelectTrigger>
@@ -213,14 +235,11 @@ export default function AttendanceCalculator() {
                 </Select>
               </div>
 
-              {/* Invert Colors toggle */}
-              <InvertToggle
-                inverted={inverted}
-                onToggle={() => setInverted(!inverted)}
-              />
+              {/* Invert toggle */}
+              <InvertToggle inverted={inverted} onChange={setInverted} />
             </div>
 
-            {/* Months in Term */}
+            {/* Term config */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label htmlFor="months-in-term">Months in Term</Label>
@@ -229,25 +248,21 @@ export default function AttendanceCalculator() {
                     <HelpCircle className="h-4 w-4" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Set how many months are in your academic term</p>
+                    <p>Set how many months are in your academic term.</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
               <Input
                 id="months-in-term"
                 type="number"
-                min={1}
                 value={monthsInTerm}
-                onChange={(e) => {
-                  const val = parseIntValue(e.target.value)
-                  setMonthsInTerm(val < 1 ? 1 : val)
-                }}
+                onChange={(e) => setMonthsInTerm(parseIntOrZero(e.target.value))}
               />
             </div>
 
-            {/* Current Status Inputs */}
+            {/* Current status inputs */}
             <div className="grid grid-cols-2 gap-4">
-              {/* Current Week */}
+              {/* Week */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="current-week">Current Week</Label>
@@ -256,24 +271,26 @@ export default function AttendanceCalculator() {
                       <HelpCircle className="h-4 w-4" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Enter which week you are currently in</p>
+                      <p>
+                        Which week are you on? Max is {WEEKS_IN_TERM} for this
+                        term.
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
                 <Input
                   id="current-week"
                   type="number"
-                  min={1}
                   value={currentWeek}
                   onChange={(e) => {
-                    const val = parseIntValue(e.target.value)
-                    const clamped = Math.min(WEEKS_IN_TERM, Math.max(1, val))
-                    setCurrentWeek(clamped)
+                    const val = parseIntOrZero(e.target.value)
+                    // clamp to not exceed WEEKS_IN_TERM
+                    setCurrentWeek(Math.min(val, WEEKS_IN_TERM))
                   }}
                 />
               </div>
 
-              {/* Attendance % */}
+              {/* Percentage */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="current-percentage">
@@ -284,7 +301,7 @@ export default function AttendanceCalculator() {
                       <HelpCircle className="h-4 w-4" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Enter your current attendance percentage</p>
+                      <p>Enter your current attendance percentage (0-100).</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -292,8 +309,6 @@ export default function AttendanceCalculator() {
                   id="current-percentage"
                   type="number"
                   step={0.01}
-                  min={0}
-                  max={100}
                   value={currentAttendancePercentage.toFixed(2)}
                   onChange={(e) => handleAttendanceChange(e.target.value)}
                 />
@@ -308,24 +323,22 @@ export default function AttendanceCalculator() {
                       <HelpCircle className="h-4 w-4" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Enter how many lectures you have attended so far</p>
+                      <p>How many lectures have you attended so far?</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
                 <Input
                   id="attended"
                   type="number"
-                  min={0}
                   value={attendedLectures}
-                  onChange={(e) => {
-                    const val = parseIntValue(e.target.value)
-                    setAttendedLectures(val < 0 ? 0 : val)
-                  }}
+                  onChange={(e) =>
+                    setAttendedLectures(parseIntOrZero(e.target.value))
+                  }
                 />
               </div>
             </div>
 
-            {/* Weekly Schedule */}
+            {/* Weekly schedule */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <h3 className="font-medium">Weekly Schedule</h3>
@@ -334,7 +347,7 @@ export default function AttendanceCalculator() {
                     <HelpCircle className="h-4 w-4" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Enter the number of lectures for each weekday</p>
+                    <p>Enter how many lectures occur each weekday.</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -345,14 +358,10 @@ export default function AttendanceCalculator() {
                     <Input
                       id={day}
                       type="number"
-                      min={0}
                       value={lectures}
                       onChange={(e) => {
-                        const val = parseIntValue(e.target.value)
-                        setSchedule((prev) => ({
-                          ...prev,
-                          [day]: val < 0 ? 0 : val,
-                        }))
+                        const val = parseIntOrZero(e.target.value)
+                        setSchedule((prev) => ({ ...prev, [day]: val }))
                       }}
                     />
                   </div>
@@ -373,8 +382,7 @@ export default function AttendanceCalculator() {
                   <Alert>
                     <InfoIcon className="h-4 w-4" />
                     <AlertDescription>
-                      Current Attendance: {results.currentPercentage.toFixed(2)}
-                      %
+                      Current Attendance: {results.currentPercentage.toFixed(2)}%
                     </AlertDescription>
                   </Alert>
                 </motion.div>
@@ -387,7 +395,7 @@ export default function AttendanceCalculator() {
                   <TabsTrigger value="term">Term</TabsTrigger>
                 </TabsList>
 
-                {/* Weekly stats */}
+                {/* Weekly */}
                 <TabsContent value="week" className="space-y-4">
                   <div className="grid gap-4">
                     <motion.div
@@ -398,7 +406,6 @@ export default function AttendanceCalculator() {
                       <span>Total lectures per week:</span>
                       <Badge variant="secondary">{results.totalPerWeek}</Badge>
                     </motion.div>
-
                     <motion.div
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -407,7 +414,6 @@ export default function AttendanceCalculator() {
                       <span>Required lectures this week for 85%:</span>
                       <Badge>{results.requiredForWeek}</Badge>
                     </motion.div>
-
                     <motion.div
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -424,7 +430,7 @@ export default function AttendanceCalculator() {
                   </div>
                 </TabsContent>
 
-                {/* Monthly stats */}
+                {/* Monthly */}
                 <TabsContent value="month" className="space-y-4">
                   <motion.div
                     initial={{ opacity: 0, x: -20 }}
@@ -436,7 +442,7 @@ export default function AttendanceCalculator() {
                   </motion.div>
                 </TabsContent>
 
-                {/* Term stats */}
+                {/* Term */}
                 <TabsContent value="term" className="space-y-4">
                   <div className="space-y-4">
                     <motion.div
@@ -447,7 +453,6 @@ export default function AttendanceCalculator() {
                       <span>Required for term ({monthsInTerm} months):</span>
                       <Badge>{results.requiredForTerm}</Badge>
                     </motion.div>
-
                     <motion.div
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
