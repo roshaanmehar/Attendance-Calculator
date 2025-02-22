@@ -88,21 +88,17 @@ const themeMap = {
   },
 }
 
+/** Clamps an integer to ≥ 0. */
 function parseIntOrZero(val: string) {
   const parsed = parseInt(val, 10)
   if (isNaN(parsed) || parsed < 0) return 0
   return parsed
 }
-function parseFloatClamped(str: string, min = 0, max = 100) {
-  const parsed = parseFloat(str)
-  if (isNaN(parsed)) return min
-  return Math.min(Math.max(parsed, min), max)
-}
 
-function roundAttendance(total: number, pct: number) {
-  // attended = round( total * pct/100 )
+/** Rounds the (pct% of total) to get attended, and computes missed. */
+function computeFromPct(total: number, pct: number) {
   const attended = Math.round((pct / 100) * total)
-  const missed = total - attended
+  const missed = Math.max(0, total - attended)
   return { attended, missed }
 }
 
@@ -113,9 +109,9 @@ export default function AttendanceCalculator() {
 
   // ====== Global Settings ======
   const [requiredAttendance, setRequiredAttendance] = useState(85)
-  const [monthsInTerm, setMonthsInTerm] = useState(3) // used to compute term total
+  const [monthsInTerm, setMonthsInTerm] = useState(3)
 
-  // ====== Daily Schedule (Mon–Sat) ======
+  // ====== Daily schedule (Mon–Sat) ======
   const [schedule, setSchedule] = useState({
     Monday: 3,
     Tuesday: 3,
@@ -124,62 +120,114 @@ export default function AttendanceCalculator() {
     Friday: 3,
     Saturday: 0,
   })
-  // computed from the schedule
+
+  // We'll compute these automatically
   const [weekTotal, setWeekTotal] = useState(0)
   const [monthTotal, setMonthTotal] = useState(0)
   const [termTotal, setTermTotal] = useState(0)
 
-  // ====== Week Attendance ======
-  const [weekAttendancePct, setWeekAttendancePct] = useState(0)
-  const [weekAttended, setWeekAttended] = useState(0)
-  const [weekMissed, setWeekMissed] = useState(0)
+  // ====== Day Info ======
+  const [dayNumber, setDayNumber] = useState("1") // user can freely type
+  const [dayTotalLectures, setDayTotalLectures] = useState("5") // user can type, default 5
+  const [dayAttended, setDayAttended] = useState("3") // user can type
+  const [dayMissed, setDayMissed] = useState(0)
+  const [dayPerc, setDayPerc] = useState(0)
 
-  // ====== Month Attendance ======
-  const [monthAttendancePct, setMonthAttendancePct] = useState(0)
-  const [monthAttended, setMonthAttended] = useState(0)
-  const [monthMissed, setMonthMissed] = useState(0)
+  // ====== Week Info ======
+  const [weekNumber, setWeekNumber] = useState("1") // which week it is
+  const [weekAttendanceStr, setWeekAttendanceStr] = useState("0") // typed % string
+  const [weekPct, setWeekPct] = useState(0) // parsed numeric
+  const [weekAttendedCalc, setWeekAttendedCalc] = useState(0)
+  const [weekMissedCalc, setWeekMissedCalc] = useState(0)
 
-  // ====== Term Attendance ======
-  const [termAttendancePct, setTermAttendancePct] = useState(0)
-  const [termAttended, setTermAttended] = useState(0)
-  const [termMissed, setTermMissed] = useState(0)
+  // ====== Month Info ======
+  const [monthNumber, setMonthNumber] = useState("1")
+  const [monthAttendanceStr, setMonthAttendanceStr] = useState("0")
+  const [monthPct, setMonthPct] = useState(0)
+  const [monthAttendedCalc, setMonthAttendedCalc] = useState(0)
+  const [monthMissedCalc, setMonthMissedCalc] = useState(0)
 
-  // Recompute weekly, monthly, term totals whenever daily schedule or monthsInTerm changes
+  // ====== Term Info ======
+  const [termAttStr, setTermAttStr] = useState("0") // typed % string
+  const [termPct, setTermPct] = useState(0)
+  const [termAttendedCalc, setTermAttendedCalc] = useState(0)
+  const [termMissedCalc, setTermMissedCalc] = useState(0)
+  const [termWeeksPassed, setTermWeeksPassed] = useState("0") // reference
+  const [termDaysPassed, setTermDaysPassed] = useState("0")  // reference
+
+  /* ==================== Compute Weekly / Monthly / Term from daily schedule ===================== */
   useEffect(() => {
-    // sum daily lectures
-    const dailySum = Object.values(schedule).reduce((a, b) => a + b, 0)
-    setWeekTotal(dailySum)
-
-    // monthly total = 4 * weekly
-    const monthly = 4 * dailySum
+    const sumDaily = Object.values(schedule).reduce((a, b) => a + b, 0)
+    setWeekTotal(sumDaily)
+    const monthly = sumDaily * 4
     setMonthTotal(monthly)
-
-    // term total = monthsInTerm * monthly
     setTermTotal(monthly * monthsInTerm)
   }, [schedule, monthsInTerm])
 
-  // Recompute weekAttended/weekMissed whenever weekAttendancePct or weekTotal changes
+  /* ==================== Day Calculation ==================== */
+  // The user can type total lectures and attended. We parse them => compute missed + %.
   useEffect(() => {
-    const { attended, missed } = roundAttendance(weekTotal, weekAttendancePct)
-    setWeekAttended(attended)
-    setWeekMissed(missed)
-  }, [weekTotal, weekAttendancePct])
+    const total = parseIntOrZero(dayTotalLectures)
+    const attended = parseIntOrZero(dayAttended)
+    const missed = Math.max(0, total - attended)
+    setDayMissed(missed)
+    const p = total > 0 ? (attended / total) * 100 : 0
+    setDayPerc(p)
+  }, [dayTotalLectures, dayAttended])
 
-  // Recompute monthAttended/monthMissed whenever monthAttendancePct or monthTotal changes
+  /* ==================== Week Calculation ==================== */
+  // The user can type a week attendance string => we parse it => compute attended vs missed from weekTotal
   useEffect(() => {
-    const { attended, missed } = roundAttendance(monthTotal, monthAttendancePct)
-    setMonthAttended(attended)
-    setMonthMissed(missed)
-  }, [monthTotal, monthAttendancePct])
+    const val = parseFloat(weekAttendanceStr)
+    if (!isNaN(val)) {
+      const clamped = Math.min(Math.max(val, 0), 100)
+      setWeekPct(clamped)
+    }
+  }, [weekAttendanceStr])
 
-  // Recompute termAttended/termMissed whenever termAttendancePct or termTotal changes
+  // Each time weekPct or weekTotal changes => recalc attended + missed
   useEffect(() => {
-    const { attended, missed } = roundAttendance(termTotal, termAttendancePct)
-    setTermAttended(attended)
-    setTermMissed(missed)
-  }, [termTotal, termAttendancePct])
+    const { attended, missed } = computeFromPct(weekTotal, weekPct)
+    setWeekAttendedCalc(attended)
+    setWeekMissedCalc(missed)
+  }, [weekPct, weekTotal])
 
-  // container + card theming
+  /* ==================== Month Calculation ==================== */
+  useEffect(() => {
+    const val = parseFloat(monthAttendanceStr)
+    if (!isNaN(val)) {
+      const clamped = Math.min(Math.max(val, 0), 100)
+      setMonthPct(clamped)
+    }
+  }, [monthAttendanceStr])
+
+  useEffect(() => {
+    const { attended, missed } = computeFromPct(monthTotal, monthPct)
+    setMonthAttendedCalc(attended)
+    setMonthMissedCalc(missed)
+  }, [monthPct, monthTotal])
+
+  /* ==================== Term Calculation ==================== */
+  useEffect(() => {
+    const val = parseFloat(termAttStr)
+    if (!isNaN(val)) {
+      const clamped = Math.min(Math.max(val, 0), 100)
+      setTermPct(clamped)
+    }
+  }, [termAttStr])
+
+  useEffect(() => {
+    const { attended, missed } = computeFromPct(termTotal, termPct)
+    setTermAttendedCalc(attended)
+    setTermMissedCalc(missed)
+  }, [termPct, termTotal])
+
+  /* ==================== Utility for progress bar color ==================== */
+  function getBarColor(pct: number) {
+    return pct < requiredAttendance ? "bg-red-500" : "bg-green-500"
+  }
+
+  // Container + card classes for theming
   const containerClass = inverted
     ? themeMap[theme].containerInvert
     : themeMap[theme].containerNormal
@@ -189,12 +237,12 @@ export default function AttendanceCalculator() {
 
   return (
     <TooltipProvider>
-      <div className={`min-h-screen w-full p-6 ${containerClass}`}>
-        {/* Page header + theme controls */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+      <div className={`min-h-screen w-full p-4 ${containerClass}`}>
+        {/* Top bar: heading + theme controls */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
           <h1 className="text-3xl font-bold">Attendance Calculator</h1>
-
           <div className="flex flex-wrap items-center gap-4">
+            {/* Theme dropdown */}
             <div className="flex items-center gap-2">
               <Label htmlFor="theme">Theme</Label>
               <Select
@@ -218,14 +266,14 @@ export default function AttendanceCalculator() {
           </div>
         </div>
 
-        {/* Global settings */}
-        <Card className={`max-w-3xl mx-auto mb-6 ${cardClass}`}>
+        {/* Required attendance + monthsInTerm */}
+        <Card className={`max-w-4xl mx-auto mb-6 ${cardClass}`}>
           <CardHeader>
             <CardTitle className="text-xl">Global Settings</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Required Attendance */}
+              {/* Required attendance */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="requiredAttendance">
@@ -237,8 +285,8 @@ export default function AttendanceCalculator() {
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>
-                        Used to color progress bars red if below requirement, or
-                        green if above.
+                        If actual attendance is below this number, we show red;
+                        else green.
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -247,11 +295,10 @@ export default function AttendanceCalculator() {
                   id="requiredAttendance"
                   type="number"
                   value={requiredAttendance}
-                  onChange={(e) =>
-                    setRequiredAttendance(
-                      parseFloatClamped(e.target.value, 0, 100)
-                    )
-                  }
+                  onChange={(e) => {
+                    const val = parseIntOrZero(e.target.value)
+                    setRequiredAttendance(val > 100 ? 100 : val)
+                  }}
                 />
               </div>
 
@@ -265,8 +312,8 @@ export default function AttendanceCalculator() {
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>
-                        How many months does the term last? Used to compute
-                        Term’s total lectures = monthsInTerm × monthly total.
+                        Used to compute <strong>term total</strong> = monthTotal
+                        × monthsInTerm.
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -282,19 +329,18 @@ export default function AttendanceCalculator() {
           </CardContent>
         </Card>
 
-        {/* Daily schedule => compute weekly, monthly, term totals */}
-        <Card className={`max-w-3xl mx-auto mb-6 ${cardClass}`}>
+        {/* Daily schedule -> week, month, term totals */}
+        <Card className={`max-w-4xl mx-auto mb-6 ${cardClass}`}>
           <CardHeader>
             <CardTitle className="text-xl">Daily Schedule (Mon–Sat)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-gray-600">
-              Enter how many lectures occur each day. If a day is zero, it’s
-              effectively an off-day. We’ll sum these for your weekly total,
-              then multiply by 4 for a monthly total, and again by the months in
-              term for your term total.
+              Enter how many lectures for each day. If zero, that day is off.
+              <br />
+              We'll sum them for a weekly total (and multiply by 4 for monthly).
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               {Object.entries(schedule).map(([day, val]) => (
                 <div key={day} className="space-y-1">
                   <Label htmlFor={day}>{day}</Label>
@@ -313,14 +359,13 @@ export default function AttendanceCalculator() {
                 </div>
               ))}
             </div>
-
-            {/* Display computed totals */}
-            <div className="space-y-2 mt-4 text-sm">
+            {/* Show computed totals */}
+            <div className="mt-4 space-y-2 text-sm">
               <p>
                 <strong>Weekly Total:</strong> {weekTotal}
               </p>
               <p>
-                <strong>Monthly Total (approx 4 weeks):</strong> {monthTotal}
+                <strong>Monthly Total (4×week):</strong> {monthTotal}
               </p>
               <p>
                 <strong>Term Total:</strong> {termTotal}
@@ -329,143 +374,183 @@ export default function AttendanceCalculator() {
           </CardContent>
         </Card>
 
-        {/* WEEK Attendance */}
-        <Card className={`max-w-3xl mx-auto mb-6 ${cardClass}`}>
+        {/* Day portion: user picks day #, total lectures, and how many they attended */}
+        <Card className={`max-w-4xl mx-auto mb-6 ${cardClass}`}>
           <CardHeader>
-            <CardTitle className="text-xl">Weekly Attendance</CardTitle>
+            <CardTitle className="text-xl">Day Attendance</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="weekAttendance">
-                    Current Weekly Attendance %
-                  </Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>
-                        Enter the weekly attendance % shown by your college
-                        portal/app. We’ll compute attended vs. missed from it.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Day # */}
+              <div className="space-y-1">
+                <Label htmlFor="dayNumber">Day #</Label>
                 <Input
-                  id="weekAttendance"
-                  type="number"
-                  step={0.01}
-                  value={weekAttendancePct.toFixed(2)}
-                  onChange={(e) =>
-                    setWeekAttendancePct(
-                      parseFloatClamped(e.target.value, 0, 100)
-                    )
-                  }
+                  id="dayNumber"
+                  type="text"
+                  value={dayNumber}
+                  onChange={(e) => setDayNumber(e.target.value)}
                 />
               </div>
 
-              <DisplayAttendance
-                periodLabel="Week"
-                total={weekTotal}
-                attendancePct={weekAttendancePct}
-                requiredAttendance={requiredAttendance}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* MONTH Attendance */}
-        <Card className={`max-w-3xl mx-auto mb-6 ${cardClass}`}>
-          <CardHeader>
-            <CardTitle className="text-xl">Monthly Attendance</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="monthAttendance">
-                    Current Monthly Attendance %
-                  </Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>
-                        Enter the monthly attendance % from your portal. We’ll
-                        compute attended vs. missed from that.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
+              {/* Day total lectures */}
+              <div className="space-y-1">
+                <Label htmlFor="dayTotalLectures">Total Lectures (Day)</Label>
                 <Input
-                  id="monthAttendance"
-                  type="number"
-                  step={0.01}
-                  value={monthAttendancePct.toFixed(2)}
-                  onChange={(e) =>
-                    setMonthAttendancePct(
-                      parseFloatClamped(e.target.value, 0, 100)
-                    )
-                  }
+                  id="dayTotalLectures"
+                  type="text"
+                  value={dayTotalLectures}
+                  onChange={(e) => setDayTotalLectures(e.target.value)}
                 />
               </div>
 
-              <DisplayAttendance
-                periodLabel="Month"
-                total={monthTotal}
-                attendancePct={monthAttendancePct}
-                requiredAttendance={requiredAttendance}
-              />
+              {/* Day attended */}
+              <div className="space-y-1">
+                <Label htmlFor="dayAttended">Attended Lectures</Label>
+                <Input
+                  id="dayAttended"
+                  type="text"
+                  value={dayAttended}
+                  onChange={(e) => setDayAttended(e.target.value)}
+                />
+              </div>
             </div>
+
+            <DayDisplay
+              dayNo={dayNumber}
+              dayMissed={dayMissed}
+              dayPerc={dayPerc}
+              required={requiredAttendance}
+            />
           </CardContent>
         </Card>
 
-        {/* TERM Attendance */}
-        <Card className={`max-w-3xl mx-auto mb-6 ${cardClass}`}>
+        {/* Week portion */}
+        <Card className={`max-w-4xl mx-auto mb-6 ${cardClass}`}>
+          <CardHeader>
+            <CardTitle className="text-xl">Week Attendance</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Week # */}
+              <div className="space-y-1">
+                <Label htmlFor="weekNumber">Week #</Label>
+                <Input
+                  id="weekNumber"
+                  type="text"
+                  value={weekNumber}
+                  onChange={(e) => setWeekNumber(e.target.value)}
+                />
+              </div>
+
+              {/* Current Attendance % as a string */}
+              <div className="space-y-1">
+                <Label htmlFor="weekAttendanceStr">
+                  Current Weekly Attendance %
+                </Label>
+                <Input
+                  id="weekAttendanceStr"
+                  type="text"
+                  value={weekAttendanceStr}
+                  onChange={(e) => setWeekAttendanceStr(e.target.value)}
+                />
+              </div>
+            </div>
+            <WeekDisplay
+              weekNo={weekNumber}
+              weekTotal={weekTotal}
+              attendancePct={weekPct}
+              attended={weekAttendedCalc}
+              missed={weekMissedCalc}
+              required={requiredAttendance}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Month portion */}
+        <Card className={`max-w-4xl mx-auto mb-6 ${cardClass}`}>
+          <CardHeader>
+            <CardTitle className="text-xl">Month Attendance</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Month # */}
+              <div className="space-y-1">
+                <Label htmlFor="monthNumber">Month #</Label>
+                <Input
+                  id="monthNumber"
+                  type="text"
+                  value={monthNumber}
+                  onChange={(e) => setMonthNumber(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="monthAttendanceStr">
+                  Current Monthly Attendance %
+                </Label>
+                <Input
+                  id="monthAttendanceStr"
+                  type="text"
+                  value={monthAttendanceStr}
+                  onChange={(e) => setMonthAttendanceStr(e.target.value)}
+                />
+              </div>
+            </div>
+            <MonthDisplay
+              monthNo={monthNumber}
+              monthTotal={monthTotal}
+              attendancePct={monthPct}
+              attended={monthAttendedCalc}
+              missed={monthMissedCalc}
+              required={requiredAttendance}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Term portion */}
+        <Card className={`max-w-4xl mx-auto mb-6 ${cardClass}`}>
           <CardHeader>
             <CardTitle className="text-xl">Term Attendance</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="termAttendance">
-                    Current Term Attendance %
-                  </Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>
-                        Enter the overall term attendance % from your portal.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <Label>Weeks Passed (info only)</Label>
                 <Input
-                  id="termAttendance"
-                  type="number"
-                  step={0.01}
-                  value={termAttendancePct.toFixed(2)}
-                  onChange={(e) =>
-                    setTermAttendancePct(
-                      parseFloatClamped(e.target.value, 0, 100)
-                    )
-                  }
+                  type="text"
+                  value={termWeeksPassed}
+                  onChange={(e) => setTermWeeksPassed(e.target.value)}
                 />
               </div>
-
-              <DisplayAttendance
-                periodLabel="Term"
-                total={termTotal}
-                attendancePct={termAttendancePct}
-                requiredAttendance={requiredAttendance}
-              />
+              <div className="space-y-1">
+                <Label>Days Passed (info only)</Label>
+                <Input
+                  type="text"
+                  value={termDaysPassed}
+                  onChange={(e) => setTermDaysPassed(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="termAttStr">
+                  Current Term Attendance %
+                </Label>
+                <Input
+                  id="termAttStr"
+                  type="text"
+                  value={termAttStr}
+                  onChange={(e) => setTermAttStr(e.target.value)}
+                />
+              </div>
             </div>
+            <TermDisplay
+              termPct={termPct}
+              termTotal={termTotal}
+              attended={termAttendedCalc}
+              missed={termMissedCalc}
+              required={requiredAttendance}
+              weeksPassed={termWeeksPassed}
+              daysPassed={termDaysPassed}
+            />
           </CardContent>
         </Card>
       </div>
@@ -473,56 +558,197 @@ export default function AttendanceCalculator() {
   )
 }
 
-/**
- * Displays the calculated "Attended" and "Missed" from the given total & attendancePct,
- * plus a color-coded progress bar based on the user’s requiredAttendance.
- */
-function DisplayAttendance({
-  periodLabel,
-  total,
-  attendancePct,
-  requiredAttendance,
+/* ================== Day Display ================== */
+function DayDisplay({
+  dayNo,
+  dayMissed,
+  dayPerc,
+  required,
 }: {
-  periodLabel: string
-  total: number
-  attendancePct: number
-  requiredAttendance: number
+  dayNo: string
+  dayMissed: number
+  dayPerc: number
+  required: number
 }) {
-  // compute actual attended & missed
-  const attended = Math.round((attendancePct / 100) * total)
-  const missed = total - attended
-
-  const belowReq = attendancePct < requiredAttendance
-  const barColor = belowReq ? "bg-red-500" : "bg-green-500"
-  const barWidth = `${Math.min(attendancePct, 100).toFixed(2)}%`
+  const below = dayPerc < required
+  const barColor = below ? "bg-red-500" : "bg-green-500"
+  const widthStr = `${Math.min(dayPerc, 100).toFixed(2)}%`
 
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key={`${periodLabel}-${attendancePct}`}
+        key={`day-${dayPerc}`}
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
         transition={{ duration: 0.2 }}
-        className="space-y-2"
       >
         <Alert className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <InfoIcon className="h-4 w-4" />
-            <AlertDescription>
-              {periodLabel} Attendance: {attendancePct.toFixed(2)}%  
-              {"  "}| Attended: {attended} | Missed: {missed}
-            </AlertDescription>
-          </div>
+          <AlertDescription>
+            <strong>Day {dayNo} Attendance:</strong> {dayPerc.toFixed(2)}% | Missed: {dayMissed}
+          </AlertDescription>
           <div className="w-full h-3 bg-gray-300 rounded">
             <motion.div
               className={`h-full rounded ${barColor}`}
               initial={{ width: 0 }}
-              animate={{ width: barWidth }}
+              animate={{ width: widthStr }}
               transition={{ duration: 0.5 }}
             />
           </div>
         </Alert>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+/* ================== Week Display ================== */
+function WeekDisplay({
+  weekNo,
+  weekTotal,
+  attendancePct,
+  attended,
+  missed,
+  required,
+}: {
+  weekNo: string
+  weekTotal: number
+  attendancePct: number
+  attended: number
+  missed: number
+  required: number
+}) {
+  const below = attendancePct < required
+  const barColor = below ? "bg-red-500" : "bg-green-500"
+  const widthStr = `${Math.min(attendancePct, 100).toFixed(2)}%`
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={`week-${attendancePct}`}
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        transition={{ duration: 0.2 }}
+      >
+        <Alert className="flex flex-col gap-2">
+          <AlertDescription>
+            <strong>Week {weekNo} Attendance:</strong> {attendancePct.toFixed(2)}%
+            <br />
+            <span>Out of {weekTotal} total lectures:</span> Attended {attended} | Missed {missed}
+          </AlertDescription>
+          <div className="w-full h-3 bg-gray-300 rounded">
+            <motion.div
+              className={`h-full rounded ${barColor}`}
+              initial={{ width: 0 }}
+              animate={{ width: widthStr }}
+              transition={{ duration: 0.5 }}
+            />
+          </div>
+        </Alert>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+/* ================== Month Display ================== */
+function MonthDisplay({
+  monthNo,
+  monthTotal,
+  attendancePct,
+  attended,
+  missed,
+  required,
+}: {
+  monthNo: string
+  monthTotal: number
+  attendancePct: number
+  attended: number
+  missed: number
+  required: number
+}) {
+  const below = attendancePct < required
+  const barColor = below ? "bg-red-500" : "bg-green-500"
+  const widthStr = `${Math.min(attendancePct, 100).toFixed(2)}%`
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={`month-${attendancePct}`}
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        transition={{ duration: 0.2 }}
+      >
+        <Alert className="flex flex-col gap-2">
+          <AlertDescription>
+            <strong>Month {monthNo} Attendance:</strong> {attendancePct.toFixed(2)}%
+            <br />
+            <span>Out of {monthTotal} total lectures:</span> Attended {attended} | Missed {missed}
+          </AlertDescription>
+          <div className="w-full h-3 bg-gray-300 rounded">
+            <motion.div
+              className={`h-full rounded ${barColor}`}
+              initial={{ width: 0 }}
+              animate={{ width: widthStr }}
+              transition={{ duration: 0.5 }}
+            />
+          </div>
+        </Alert>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+/* ================== Term Display ================== */
+function TermDisplay({
+  termPct,
+  termTotal,
+  attended,
+  missed,
+  required,
+  weeksPassed,
+  daysPassed,
+}: {
+  termPct: number
+  termTotal: number
+  attended: number
+  missed: number
+  required: number
+  weeksPassed: string
+  daysPassed: string
+}) {
+  const below = termPct < required
+  const barColor = below ? "bg-red-500" : "bg-green-500"
+  const widthStr = `${Math.min(termPct, 100).toFixed(2)}%`
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={`term-${termPct}`}
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        transition={{ duration: 0.2 }}
+      >
+        <Alert className="flex flex-col gap-2">
+          <AlertDescription>
+            <strong>Term Attendance:</strong> {termPct.toFixed(2)}%  
+            <br />
+            <span>Out of {termTotal} total lectures:</span> Attended {attended} | Missed {missed}
+          </AlertDescription>
+          <div className="w-full h-3 bg-gray-300 rounded">
+            <motion.div
+              className={`h-full rounded ${barColor}`}
+              initial={{ width: 0 }}
+              animate={{ width: widthStr }}
+              transition={{ duration: 0.5 }}
+            />
+          </div>
+        </Alert>
+        <div className="mt-2 text-sm text-gray-600 space-y-1">
+          <p>Weeks passed (info): {weeksPassed}</p>
+          <p>Days passed (info): {daysPassed}</p>
+        </div>
       </motion.div>
     </AnimatePresence>
   )
