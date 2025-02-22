@@ -1,200 +1,166 @@
-Attendance Calculator 📊
+# Attendance Calculator
 
-A React-based tool to calculate how many lectures you can miss while maintaining your desired attendance percentage. Supports daily, monthly, and term-based tracking.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-
-![Demo](https://via.placeholder.com/800x400?text=Attendance+Calculator+Demo) <!-- Replace with actual screenshot -->
+A personal project built to help determine how many lectures you can skip without your attendance falling below a specific threshold. What started as a simple experiment evolved into a fully interactive attendance tracker with a variety of features and customization options.
 
 ---
 
 ## Table of Contents
-- [Motivation](#motivation)
-- [Key Features](#key-features)
-- [How It Works](#how-it-works)
-- [Tech Stack](#tech-stack)
+
+- [Introduction & Motivation](#introduction--motivation)
+- [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
-- [Limitations](#limitations)
-- [Future Roadmap](#future-roadmap)
+- [Detailed Functionality](#detailed-functionality)
+- [Future Improvements](#future-improvements)
 - [Contact](#contact)
+- [License](#license)
 
 ---
 
-## Motivation
-Students often struggle to balance attendance requirements with other commitments. This tool answers:  
-***"How many lectures can I skip without falling below my institution's attendance threshold?"***  
+## Introduction & Motivation
 
-Originally built for personal use, it now supports:
-- Daily schedule customization
-- Monthly progress tracking
-- Term-wide attendance management
+This project was initially created as a personal challenge to figure out the maximum number of lectures I could skip without jeopardizing my required attendance percentage. Over time, I expanded its functionality by adding detailed calculations for weekly, monthly, and term-based attendance. The project now serves as a versatile tool for students who want to monitor and plan their attendance effectively.
 
 ---
 
-## Key Features
-✅ **Daily Schedule Builder**  
-- Set lectures per weekday (Mon-Sat)
-- Auto-calculates weekly/monthly totals
+## Features
 
-🎯 **Attendance Calculator**  
-- Input current attendance percentage
-- See exact attended/missed lecture counts
-- Visual progress bars with threshold indicators
+- **Dynamic Theming:**  
+  Customize the UI with multiple themes (rose, zinc, blue, green, purple) and an option to invert the color scheme.
 
-📅 **Flexible Tracking**  
-- Monthly: Track by weeks + extra days
-- Term: Combine months + weeks + days
+- **Real-Time Calculations:**  
+  Automatically computes weekly, monthly, and term totals based on your daily lecture schedule.
 
-🎨 **Theme Customization**  
-- Multiple color palettes (Rose, Zinc, Blue, etc.)
-- Light/dark mode toggle
+- **Customizable Global Settings:**  
+  Set your required attendance percentage and the number of months in a term.
+
+- **Detailed Attendance Breakdown:**  
+  Input partial data (weeks and days passed) to get precise calculations of attended and missed lectures for both month and term.
+
+- **Animated UI:**  
+  Uses [Framer Motion](https://www.framer.com/motion/) for smooth transitions and alerts, enhancing the user experience.
+
+- **Responsive and Accessible UI Components:**  
+  Built using [shadcn/ui](https://ui.shadcn.com/) components for consistency and accessibility.
 
 ---
 
-## How It Works
+## Installation
 
-### Daily Schedule
-```math
-Weekly Total = Σ (Mon + Tue + Wed + Thu + Fri + Sat)
-Monthly Total = Weekly Total × 4
+To run this project locally, follow these steps:
 
-Monthly Tracking
-math
+1. **Clone the Repository:**
+
+   ```bash
+   git clone https://github.com/your-username/attendance-calculator.git
+   cd attendance-calculator
+Install Dependencies:
+
+Make sure you have Node.js installed. Then run:
+
+bash
 Copy
+Edit
+npm install
+Run the Development Server:
 
-Partial Month Total = (Weeks Passed × Weekly Total) + Extra Days
-Attended = (Current % × Partial Month Total) / 100
-Missed = Partial Month Total - Attended
-
-Term Tracking
-math
+bash
 Copy
-
-Partial Term Total = (Months Passed × Monthly Total) + (Weeks × Weekly Total) + Extra Days
-Term Attended = (Term % × Partial Term Total) / 100
-
-Tech Stack
-
-Frontend
-React
-Next.js
-TypeScript
-
-UI Components
-Shadcn/ui
-Framer Motion
-Lucide Icons
-Installation
-
-    Clone repository:
-    bash
-    Copy
-
-    git clone https://github.com/yourusername/attendance-calculator.git
-    cd attendance-calculator
-
-    Install dependencies:
-    bash
-    Copy
-
-    npm install
-    # or
-    yarn
-
-    Start development server:
-    bash
-    Copy
-
-    npm run dev
-    # or
-    yarn dev
-
-    Open in browser: http://localhost:3000
+Edit
+npm run dev
+Open your browser and navigate to http://localhost:3000 to view the application.
 
 Usage
+Once the application is running:
 
-    Set Up Schedule
+Set Global Settings:
+Adjust the required attendance percentage and define the number of months in your term.
 
-        Enter lectures for each weekday
+Configure Your Daily Schedule:
+Input the number of lectures for each day (Monday through Saturday). The app automatically calculates the weekly, monthly, and full-term totals.
 
-        System auto-calculates weekly/monthly totals
+Monthly Attendance:
+Enter the current month number, the number of complete weeks and additional days passed, and your current attendance percentage for that month. The app displays the number of lectures attended and missed, along with a visual progress bar.
 
-    Track Monthly Attendance
+Term Attendance (Optional):
+For a broader view, input the number of full months, weeks, and days passed in the term along with the current term attendance percentage. The tool then computes your overall term attendance.
 
-        Enter completed weeks + extra days
+Theming Options:
+Use the dropdown menu to select a theme and toggle the inversion option to change the overall look and feel of the application.
 
-        Input current attendance percentage
+Detailed Functionality
+Theme & Inversion
+Theme Map:
+A mapping object defines different color classes for container and card elements based on the selected theme.
 
-        View attended/missed counts
+Invert Toggle:
+A minimal checkbox component to invert the theme colors for a darker or lighter appearance.
 
-    Monitor Term Progress
+Global Settings
+Required Attendance %:
+Sets the minimum attendance threshold, influencing the color of the progress bars (red if below, green if above).
 
-        Specify completed months + extra weeks/days
+Months in Term:
+Defines the number of months that make up a full term, which is used to compute term totals.
 
-        Input term attendance percentage
+Daily Schedule
+Schedule State:
+Allows you to input lectures for each day (Monday–Saturday). These values are summed to create weekly and monthly totals.
 
-        See overall performance
+Computed Totals:
+Automatically computes:
 
-    Customize Appearance
+Weekly Total: Sum of daily lectures.
+Monthly Total: Weekly total multiplied by 4.
+Term Total: Monthly total multiplied by the number of months in the term.
+Monthly & Term Calculations
+Partial Month Calculation:
+Uses inputs for weeks and days passed in the current month to compute the partial month total. Then, it calculates attended versus missed lectures based on the current attendance percentage.
 
-        Click palette icon to change theme
+Partial Term Calculation:
+Similarly computes the term attendance using full months, additional weeks, and days passed, providing a detailed breakdown.
 
-        Toggle between light/dark modes
+Utility Functions
+parseIntOrZero:
+Clamps a given input to an integer ≥ 0.
 
-Contributing
+computeFromPct:
+Rounds the percentage of total lectures attended and calculates the number of missed lectures.
 
-We welcome contributions! Here's how:
+calcSkipAllowed:
+Determines the maximum number of lectures that can be skipped while still meeting the required attendance.
 
-    Fork the repository
+sumFirstNDays:
+Sums the lectures from Monday to Saturday for a given number of days, useful for calculating partial week totals.
 
-    Create your feature branch:
-    bash
-    Copy
+Animated Display Components
+MonthDisplay & TermDisplay:
+Components that utilize Framer Motion to animate the progress bars and attendance alerts, providing visual feedback on attendance performance.
+Future Improvements
+Enhanced Validation:
+Improve input validation and error handling for edge cases.
 
-    git checkout -b feature/amazing-feature
+Responsive Design:
+Further optimize the UI for mobile devices.
 
-    Commit changes:
-    bash
-    Copy
+Data Persistence:
+Add local storage or cloud-based persistence to save user progress.
 
-    git commit -m 'Add amazing feature'
+Export Functionality:
+Allow users to export their attendance data as CSV or PDF.
 
-    Push to branch:
-    bash
-    Copy
+Unit Testing:
+Implement comprehensive tests to ensure reliability.
 
-    git push origin feature/amazing-feature
-
-    Open a Pull Request
-
-License
-
-Distributed under the MIT License. See LICENSE for details.
-Limitations
-
-    Assumes 4-week months (fixed duration)
-
-    No holiday/break accommodation
-
-    Manual data entry required
-
-Future Roadmap
-
-    Dynamic skip allowance calculator
-
-    Calendar integration (Google/Outlook)
-
-    Automatic percentage projections
-
-    Mobile app version
-
-    PDF report generation
+Additional Metrics:
+Introduce more detailed analytics and historical performance tracking.
 
 Contact
+For feedback, suggestions, or any inquiries, feel free to reach out:
 
-For questions/suggestions:
-📧 your.email@example.com
-🐦 @yourtwitterhandle
+Email: your.email@example.com
+GitHub Issues: Open an issue on the GitHub repository.
+License
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+
