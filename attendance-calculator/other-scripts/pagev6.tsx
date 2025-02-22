@@ -113,12 +113,9 @@ export default function AttendanceCalculator() {
     Friday: 2,
   })
 
-  // Term structure
   const [currentWeek, setCurrentWeek] = useState(1)
-  const [monthsInTerm, setMonthsInTerm] = useState(3)
-  const [currentMonth, setCurrentMonth] = useState(1)
-
-  // Attendance
+  const [monthsInTerm, setMonthsInTerm] = useState(4)
+  const [currentMonth, setCurrentMonth] = useState(1) // new: for a more direct monthly calc
   const [attendedLectures, setAttendedLectures] = useState(0)
   const [currentAttendancePercentage, setCurrentAttendancePercentage] =
     useState<number>(0)
@@ -134,11 +131,10 @@ export default function AttendanceCalculator() {
   const [results, setResults] = useState({
     totalPerWeek: 0,
     requiredForWeek: 0,
-    requiredForMonth: 0, // bulletproof monthly
+    requiredForMonth: 0,
     requiredForTerm: 0,
     currentPercentage: 0,
     missableLectures: 0,
-    canSkipMonth: 0, // new field to show how many can be missed for the remainder of this month
   })
 
   const WEEKS_IN_MONTH = 4
@@ -155,11 +151,21 @@ export default function AttendanceCalculator() {
       (requiredAttendance / 100) * totalLecturesPerWeek
     )
 
-    // Basic attendance percentage
-    const currentPercentage =
-      totalPossibleLectures === 0
-        ? 0
-        : (attendedLectures / totalPossibleLectures) * 100
+    // For monthly, we try to see how many lectures happen in one typical "4-week" month
+    const totalLecturesInMonth = WEEKS_IN_MONTH * totalLecturesPerWeek
+
+    // We guess how many were attended in the *current* month by computing:
+    // all lectures attended so far - all lectures in previous full months
+    const previousMonths = currentMonth - 1
+    const lecturesPreviousMonths = previousMonths * totalLecturesInMonth
+    const attendedThisMonthSoFar = Math.max(0, attendedLectures - lecturesPreviousMonths)
+
+    // Then the required for this month is:
+    //  (required % of total in a month) - how many you've already done this month
+    const rawRequiredForMonth = Math.ceil(
+      (requiredAttendance / 100) * totalLecturesInMonth - attendedThisMonthSoFar
+    )
+    const requiredForMonth = Math.max(0, rawRequiredForMonth)
 
     // Term calculations
     const rawRequiredForTerm = Math.ceil(
@@ -167,6 +173,13 @@ export default function AttendanceCalculator() {
     )
     const requiredForTerm = Math.max(0, rawRequiredForTerm)
 
+    // Current attendance percentage
+    const currentPercentage =
+      totalPossibleLectures === 0
+        ? 0
+        : (attendedLectures / totalPossibleLectures) * 100
+
+    // Missable lectures for entire term
     const minimumRequired = Math.ceil(
       (requiredAttendance / 100) * totalTermLectures
     )
@@ -176,55 +189,13 @@ export default function AttendanceCalculator() {
       missableTotal - (totalPossibleLectures - attendedLectures)
     )
 
-    // “Bulletproof” monthly logic
-    // Step 1: how many weeks of the current month have we completed so far?
-    //   e.g. if currentMonth=1 and currentWeek=3 => we are in the 3rd week of the 1st month => so weeksSoFar=3
-    //   e.g. if currentMonth=2 and currentWeek=6 => weeksSoFar=6 - 4=2 (the 2nd month’s 2nd week)
-    const weeksSoFarInMonth = Math.max(
-      0,
-      Math.min(
-        4,
-        currentWeek - (currentMonth - 1) * 4
-      )
-    )
-
-    // Step 2: total lectures so far in *this* month
-    const lecturesSoFarInMonth = weeksSoFarInMonth * totalLecturesPerWeek
-
-    // We assume the user’s “attendedLectures” is total across the entire term,
-    // but we can’t know how many were from this month vs. prior months.
-    // We estimate "attendedSoFarInMonth" as:
-    //   min(attendedLectures, lecturesSoFarInMonth)
-    // to avoid claiming they attended more than were available in this month so far.
-    const attendedSoFarInMonth = Math.min(attendedLectures, lecturesSoFarInMonth)
-
-    // total month capacity
-    const totalMonthLectures = 4 * totalLecturesPerWeek
-
-    // how many needed to reach requiredAttendance for a *full* 4-week chunk
-    const neededFullMonth = Math.ceil(
-      (requiredAttendance / 100) * totalMonthLectures
-    )
-
-    // how many more do they need *this month* from now onward
-    const requiredForMonth = Math.max(0, neededFullMonth - attendedSoFarInMonth)
-
-    // how many lectures are left in the remainder of this month
-    //   e.g. if 3 weeks have passed => 42 have already occurred => 14 remain
-    const remainingLecturesThisMonth = totalMonthLectures - lecturesSoFarInMonth
-
-    // how many can we skip from the remainder
-    //   if we need 12 more to reach the monthly target, but 14 remain, we can skip 2
-    const canSkipMonth = Math.max(0, remainingLecturesThisMonth - requiredForMonth)
-
     setResults({
       totalPerWeek: totalLecturesPerWeek,
       requiredForWeek,
-      requiredForMonth, // how many more to attend
+      requiredForMonth,
       requiredForTerm,
       currentPercentage,
       missableLectures: missableRemaining,
-      canSkipMonth,
     })
   }, [
     schedule,
@@ -266,15 +237,17 @@ export default function AttendanceCalculator() {
     ? themeMap[theme].cardInvert
     : themeMap[theme].cardNormal
 
-  // Progress bar color: if current < required => red; else green
+  // A small progress bar or color-coded display for current attendance
+  // We'll color it red if current < required; green otherwise
   const isBelowRequired = results.currentPercentage < requiredAttendance
   const progressColor = isBelowRequired ? "bg-red-500" : "bg-green-500"
   const progressWidth = `${Math.min(results.currentPercentage, 100).toFixed(2)}%`
 
   return (
     <TooltipProvider>
+      {/* The entire page uses the selected theme variant */}
       <div className={`min-h-screen w-full p-6 ${containerClass}`}>
-        {/* Top toolbar */}
+        {/* "Toolbar" at the top with big heading */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
           <h1 className="text-3xl font-bold">Attendance Calculator</h1>
 
@@ -578,26 +551,22 @@ export default function AttendanceCalculator() {
                   animate={{ opacity: 1, x: 0 }}
                   className="flex justify-between items-center"
                 >
-                  <span>Lectures needed this month ({currentMonth}):</span>
+                  <span>Required for Month {currentMonth}:</span>
                   <Badge>{results.requiredForMonth}</Badge>
                 </motion.div>
-
-                {/* We also show how many can be skipped from the remainder of this month */}
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex justify-between items-center"
-                >
-                  <span>Lectures you can still miss this month:</span>
-                  <Badge variant="outline">{results.canSkipMonth}</Badge>
-                </motion.div>
-
                 <p className="text-sm text-gray-500">
-                  <strong>Note:</strong> This monthly calculation estimates how many
-                  lectures you’ve had in this month so far based on currentWeek and
-                  currentMonth. If your actual schedule spans partial weeks or
-                  doesn’t align perfectly, these values are approximate.
+                  <strong>Note:</strong> The monthly calculation assumes each
+                  month is exactly 4 weeks. If your weeks/months don’t align
+                  neatly, these numbers are approximate.
                 </p>
+                {results.requiredForMonth > 0 && (
+                  <p className="text-sm">
+                    You can still miss up to{" "}
+                    <strong>{results.requiredForMonth - 1}</strong> more
+                    lectures this month before dropping below {requiredAttendance}%
+                    (approx).
+                  </p>
+                )}
               </TabsContent>
 
               {/* Term */}
@@ -618,7 +587,7 @@ export default function AttendanceCalculator() {
                     animate={{ opacity: 1, x: 0 }}
                     className="flex justify-between items-center"
                   >
-                    <span>Remaining lectures you can miss (whole term):</span>
+                    <span>Remaining lectures you can miss:</span>
                     <Badge variant="outline">
                       {results.missableLectures}
                     </Badge>
