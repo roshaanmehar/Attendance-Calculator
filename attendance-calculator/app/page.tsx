@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   Tooltip,
@@ -51,9 +50,10 @@ function InvertToggle({
   )
 }
 
-/** 
- * Themes: containerNormal/containerInvert => page background
- *         cardNormal/cardInvert => card styling
+/**
+ * Themes:
+ *  - containerNormal/containerInvert => entire page background
+ *  - cardNormal/cardInvert => card styling
  */
 const themeMap = {
   rose: {
@@ -88,7 +88,6 @@ const themeMap = {
   },
 }
 
-// Helpers
 function parseIntOrZero(val: string) {
   const parsed = parseInt(val, 10)
   if (isNaN(parsed) || parsed < 0) return 0
@@ -100,103 +99,85 @@ function parseFloatClamped(str: string, min = 0, max = 100) {
   return Math.min(Math.max(parsed, min), max)
 }
 
-/** 
- * Returns an object with:
- *   attended => round( (attendance%/100)*total )
- *   missed => total - attended
- */
-function computeFromPercentage(
-  total: number,
-  attendancePct: number
-): { attended: number; missed: number } {
-  const attended = Math.round((attendancePct / 100) * total)
+function roundAttendance(total: number, pct: number) {
+  // attended = round( total * pct/100 )
+  const attended = Math.round((pct / 100) * total)
   const missed = total - attended
   return { attended, missed }
 }
 
 export default function AttendanceCalculator() {
-  // Theming
+  // ====== Theme/Invert ======
   const [theme, setTheme] = useState<keyof typeof themeMap>("rose")
   const [inverted, setInverted] = useState(false)
 
-  // Required attendance (used for progress bar color-coded)
+  // ====== Global Settings ======
   const [requiredAttendance, setRequiredAttendance] = useState(85)
+  const [monthsInTerm, setMonthsInTerm] = useState(3) // used to compute term total
 
-  // ========== DAY ==========
-  const [dayNumber, setDayNumber] = useState(1)
-  const [dayTotal, setDayTotal] = useState(5) // e.g. 5 lectures today
-  const [dayAttended, setDayAttended] = useState(0)
-  const [dayMissed, setDayMissed] = useState(0)
-  const [dayPerc, setDayPerc] = useState(0)
+  // ====== Daily Schedule (Mon–Sat) ======
+  const [schedule, setSchedule] = useState({
+    Monday: 3,
+    Tuesday: 3,
+    Wednesday: 3,
+    Thursday: 3,
+    Friday: 3,
+    Saturday: 0,
+  })
+  // computed from the schedule
+  const [weekTotal, setWeekTotal] = useState(0)
+  const [monthTotal, setMonthTotal] = useState(0)
+  const [termTotal, setTermTotal] = useState(0)
 
-  // ========== WEEK ==========
-  const [weekNumber, setWeekNumber] = useState(1)
-  const [weekTotal, setWeekTotal] = useState(25) // e.g. 25 lectures in the entire week
+  // ====== Week Attendance ======
   const [weekAttendancePct, setWeekAttendancePct] = useState(0)
   const [weekAttended, setWeekAttended] = useState(0)
   const [weekMissed, setWeekMissed] = useState(0)
 
-  // ========== MONTH ==========
-  const [monthNumber, setMonthNumber] = useState(1)
-  const [monthTotal, setMonthTotal] = useState(100) // e.g. 100 lectures in the entire month
+  // ====== Month Attendance ======
   const [monthAttendancePct, setMonthAttendancePct] = useState(0)
   const [monthAttended, setMonthAttended] = useState(0)
   const [monthMissed, setMonthMissed] = useState(0)
 
-  // ========== TERM ==========
-  const [termMonthsPassed, setTermMonthsPassed] = useState(0) // informational
-  const [termWeeksPassed, setTermWeeksPassed] = useState(0) // informational
-  const [termDaysPassed, setTermDaysPassed] = useState(0) // informational
-  const [termTotal, setTermTotal] = useState(300) // e.g. total lectures in the entire term
+  // ====== Term Attendance ======
   const [termAttendancePct, setTermAttendancePct] = useState(0)
   const [termAttended, setTermAttended] = useState(0)
   const [termMissed, setTermMissed] = useState(0)
 
-  // ========== Effects ==========
-
-  // Day: user sets total and attended => we compute missed + % 
+  // Recompute weekly, monthly, term totals whenever daily schedule or monthsInTerm changes
   useEffect(() => {
-    const missed = Math.max(0, dayTotal - dayAttended)
-    setDayMissed(missed)
-    const dayRatio = dayTotal > 0 ? (dayAttended / dayTotal) * 100 : 0
-    setDayPerc(dayRatio)
-  }, [dayTotal, dayAttended])
+    // sum daily lectures
+    const dailySum = Object.values(schedule).reduce((a, b) => a + b, 0)
+    setWeekTotal(dailySum)
 
-  // Week: user sets total + attendance% => we compute attended + missed
+    // monthly total = 4 * weekly
+    const monthly = 4 * dailySum
+    setMonthTotal(monthly)
+
+    // term total = monthsInTerm * monthly
+    setTermTotal(monthly * monthsInTerm)
+  }, [schedule, monthsInTerm])
+
+  // Recompute weekAttended/weekMissed whenever weekAttendancePct or weekTotal changes
   useEffect(() => {
-    const { attended, missed } = computeFromPercentage(
-      weekTotal,
-      weekAttendancePct
-    )
+    const { attended, missed } = roundAttendance(weekTotal, weekAttendancePct)
     setWeekAttended(attended)
     setWeekMissed(missed)
   }, [weekTotal, weekAttendancePct])
 
-  // Month: user sets total + attendance% => we compute attended + missed
+  // Recompute monthAttended/monthMissed whenever monthAttendancePct or monthTotal changes
   useEffect(() => {
-    const { attended, missed } = computeFromPercentage(
-      monthTotal,
-      monthAttendancePct
-    )
+    const { attended, missed } = roundAttendance(monthTotal, monthAttendancePct)
     setMonthAttended(attended)
     setMonthMissed(missed)
   }, [monthTotal, monthAttendancePct])
 
-  // Term: user sets total + attendance% => we compute attended + missed
+  // Recompute termAttended/termMissed whenever termAttendancePct or termTotal changes
   useEffect(() => {
-    const { attended, missed } = computeFromPercentage(
-      termTotal,
-      termAttendancePct
-    )
+    const { attended, missed } = roundAttendance(termTotal, termAttendancePct)
     setTermAttended(attended)
     setTermMissed(missed)
   }, [termTotal, termAttendancePct])
-
-  // ========== Progress Bar Coloring ==========
-
-  function progressBarColor(currentPerc: number) {
-    return currentPerc < requiredAttendance ? "bg-red-500" : "bg-green-500"
-  }
 
   // container + card theming
   const containerClass = inverted
@@ -209,12 +190,11 @@ export default function AttendanceCalculator() {
   return (
     <TooltipProvider>
       <div className={`min-h-screen w-full p-6 ${containerClass}`}>
-        {/* Top bar with heading and theme controls */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+        {/* Page header + theme controls */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
           <h1 className="text-3xl font-bold">Attendance Calculator</h1>
 
           <div className="flex flex-wrap items-center gap-4">
-            {/* Theme dropdown */}
             <div className="flex items-center gap-2">
               <Label htmlFor="theme">Theme</Label>
               <Select
@@ -234,197 +214,147 @@ export default function AttendanceCalculator() {
               </Select>
             </div>
 
-            {/* Invert */}
             <InvertToggle inverted={inverted} onChange={setInverted} />
           </div>
         </div>
 
-        {/* Required attendance */}
+        {/* Global settings */}
         <Card className={`max-w-3xl mx-auto mb-6 ${cardClass}`}>
           <CardHeader>
             <CardTitle className="text-xl">Global Settings</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="requiredAttendance">Required Attendance %</Label>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <HelpCircle className="h-4 w-4" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>
-                      Set the target attendance percentage you want to compare
-                      against.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Input
-                id="requiredAttendance"
-                type="number"
-                value={requiredAttendance}
-                onChange={(e) => {
-                  const val = parseFloatClamped(e.target.value)
-                  setRequiredAttendance(val)
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* DAY */}
-        <Card className={`max-w-3xl mx-auto mb-6 ${cardClass}`}>
-          <CardHeader>
-            <CardTitle className="text-xl">Day Attendance</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Day # */}
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Required Attendance */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="day-number">Day #</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Which day is it? (reference only)</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Input
-                  id="day-number"
-                  type="number"
-                  value={dayNumber}
-                  onChange={(e) => setDayNumber(parseIntOrZero(e.target.value))}
-                />
-              </div>
-
-              {/* Total Lectures */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="day-total">Total Lectures</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>How many lectures occur today?</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Input
-                  id="day-total"
-                  type="number"
-                  value={dayTotal}
-                  onChange={(e) => setDayTotal(parseIntOrZero(e.target.value))}
-                />
-              </div>
-
-              {/* Attended Lectures */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="day-attended">Attended Lectures</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>How many did you attend out of today's total?</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Input
-                  id="day-attended"
-                  type="number"
-                  value={dayAttended}
-                  onChange={(e) =>
-                    setDayAttended(parseIntOrZero(e.target.value))
-                  }
-                />
-              </div>
-            </div>
-
-            {/* Display for Missed & Percentage */}
-            <DayCardDisplay
-              dayMissed={dayMissed}
-              dayPerc={dayPerc}
-              requiredAttendance={requiredAttendance}
-            />
-          </CardContent>
-        </Card>
-
-        {/* WEEK */}
-        <Card className={`max-w-3xl mx-auto mb-6 ${cardClass}`}>
-          <CardHeader>
-            <CardTitle className="text-xl">Week Attendance</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Week # */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="week-number">Week #</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Which week is it (just for reference)?</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Input
-                  id="week-number"
-                  type="number"
-                  value={weekNumber}
-                  onChange={(e) =>
-                    setWeekNumber(parseIntOrZero(e.target.value))
-                  }
-                />
-              </div>
-
-              {/* Total Lectures This Week */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="week-total">Total Lectures (Week)</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>How many lectures occur this entire week?</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Input
-                  id="week-total"
-                  type="number"
-                  value={weekTotal}
-                  onChange={(e) =>
-                    setWeekTotal(parseIntOrZero(e.target.value))
-                  }
-                />
-              </div>
-
-              {/* Current Attendance % */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="week-attendance">
-                    Current Attendance %
+                  <Label htmlFor="requiredAttendance">
+                    Required Attendance %
                   </Label>
                   <Tooltip>
                     <TooltipTrigger>
                       <HelpCircle className="h-4 w-4" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Your app or portal’s weekly attendance percentage.</p>
+                      <p>
+                        Used to color progress bars red if below requirement, or
+                        green if above.
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
                 <Input
-                  id="week-attendance"
+                  id="requiredAttendance"
+                  type="number"
+                  value={requiredAttendance}
+                  onChange={(e) =>
+                    setRequiredAttendance(
+                      parseFloatClamped(e.target.value, 0, 100)
+                    )
+                  }
+                />
+              </div>
+
+              {/* Months in Term */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="monthsInTerm">Months in Term</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="h-4 w-4" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>
+                        How many months does the term last? Used to compute
+                        Term’s total lectures = monthsInTerm × monthly total.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Input
+                  id="monthsInTerm"
+                  type="number"
+                  value={monthsInTerm}
+                  onChange={(e) => setMonthsInTerm(parseIntOrZero(e.target.value))}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Daily schedule => compute weekly, monthly, term totals */}
+        <Card className={`max-w-3xl mx-auto mb-6 ${cardClass}`}>
+          <CardHeader>
+            <CardTitle className="text-xl">Daily Schedule (Mon–Sat)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Enter how many lectures occur each day. If a day is zero, it’s
+              effectively an off-day. We’ll sum these for your weekly total,
+              then multiply by 4 for a monthly total, and again by the months in
+              term for your term total.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {Object.entries(schedule).map(([day, val]) => (
+                <div key={day} className="space-y-1">
+                  <Label htmlFor={day}>{day}</Label>
+                  <Input
+                    id={day}
+                    type="number"
+                    value={val}
+                    onChange={(e) => {
+                      const newVal = parseIntOrZero(e.target.value)
+                      setSchedule((prev) => ({
+                        ...prev,
+                        [day]: newVal,
+                      }))
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Display computed totals */}
+            <div className="space-y-2 mt-4 text-sm">
+              <p>
+                <strong>Weekly Total:</strong> {weekTotal}
+              </p>
+              <p>
+                <strong>Monthly Total (approx 4 weeks):</strong> {monthTotal}
+              </p>
+              <p>
+                <strong>Term Total:</strong> {termTotal}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* WEEK Attendance */}
+        <Card className={`max-w-3xl mx-auto mb-6 ${cardClass}`}>
+          <CardHeader>
+            <CardTitle className="text-xl">Weekly Attendance</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="weekAttendance">
+                    Current Weekly Attendance %
+                  </Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="h-4 w-4" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>
+                        Enter the weekly attendance % shown by your college
+                        portal/app. We’ll compute attended vs. missed from it.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Input
+                  id="weekAttendance"
                   type="number"
                   step={0.01}
                   value={weekAttendancePct.toFixed(2)}
@@ -435,88 +365,43 @@ export default function AttendanceCalculator() {
                   }
                 />
               </div>
-            </div>
 
-            {/* Show computed “Attended,” “Missed,” etc. */}
-            <WeekCardDisplay
-              attended={weekAttended}
-              missed={weekMissed}
-              attendancePct={weekAttendancePct}
-              requiredAttendance={requiredAttendance}
-            />
+              <DisplayAttendance
+                periodLabel="Week"
+                total={weekTotal}
+                attendancePct={weekAttendancePct}
+                requiredAttendance={requiredAttendance}
+              />
+            </div>
           </CardContent>
         </Card>
 
-        {/* MONTH */}
+        {/* MONTH Attendance */}
         <Card className={`max-w-3xl mx-auto mb-6 ${cardClass}`}>
           <CardHeader>
-            <CardTitle className="text-xl">Month Attendance</CardTitle>
+            <CardTitle className="text-xl">Monthly Attendance</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Month # */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="month-number">Month #</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Which month is it (just for reference)?</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Input
-                  id="month-number"
-                  type="number"
-                  value={monthNumber}
-                  onChange={(e) =>
-                    setMonthNumber(parseIntOrZero(e.target.value))
-                  }
-                />
-              </div>
-
-              {/* Total Lectures (Month) */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="month-total">Total Lectures (Month)</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>How many lectures occur in this entire month?</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Input
-                  id="month-total"
-                  type="number"
-                  value={monthTotal}
-                  onChange={(e) =>
-                    setMonthTotal(parseIntOrZero(e.target.value))
-                  }
-                />
-              </div>
-
-              {/* Current Attendance % */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="month-attendance">
-                    Current Attendance %
+                  <Label htmlFor="monthAttendance">
+                    Current Monthly Attendance %
                   </Label>
                   <Tooltip>
                     <TooltipTrigger>
                       <HelpCircle className="h-4 w-4" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Your app/portal’s monthly attendance percentage.</p>
+                      <p>
+                        Enter the monthly attendance % from your portal. We’ll
+                        compute attended vs. missed from that.
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
                 <Input
-                  id="month-attendance"
+                  id="monthAttendance"
                   type="number"
                   step={0.01}
                   value={monthAttendancePct.toFixed(2)}
@@ -527,152 +412,60 @@ export default function AttendanceCalculator() {
                   }
                 />
               </div>
-            </div>
 
-            <MonthCardDisplay
-              attended={monthAttended}
-              missed={monthMissed}
-              attendancePct={monthAttendancePct}
-              requiredAttendance={requiredAttendance}
-            />
+              <DisplayAttendance
+                periodLabel="Month"
+                total={monthTotal}
+                attendancePct={monthAttendancePct}
+                requiredAttendance={requiredAttendance}
+              />
+            </div>
           </CardContent>
         </Card>
 
-        {/* TERM */}
+        {/* TERM Attendance */}
         <Card className={`max-w-3xl mx-auto mb-6 ${cardClass}`}>
           <CardHeader>
             <CardTitle className="text-xl">Term Attendance</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Months Passed */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="term-months-passed">Months Passed</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>How many months have passed in the term? (info only)</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Input
-                  id="term-months-passed"
-                  type="number"
-                  value={termMonthsPassed}
-                  onChange={(e) =>
-                    setTermMonthsPassed(parseIntOrZero(e.target.value))
-                  }
-                />
-              </div>
-
-              {/* Weeks Passed */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="term-weeks-passed">Weeks Passed</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>How many weeks have passed (beyond those months)?</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Input
-                  id="term-weeks-passed"
-                  type="number"
-                  value={termWeeksPassed}
-                  onChange={(e) =>
-                    setTermWeeksPassed(parseIntOrZero(e.target.value))
-                  }
-                />
-              </div>
-
-              {/* Days Passed */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="term-days-passed">Days Passed</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>How many days have passed (beyond those weeks)?</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Input
-                  id="term-days-passed"
-                  type="number"
-                  value={termDaysPassed}
-                  onChange={(e) =>
-                    setTermDaysPassed(parseIntOrZero(e.target.value))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Total Lectures (Term) */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="term-total">Total Lectures (Term)</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="h-4 w-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>How many lectures are in the entire term (so far)?</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Input
-                  id="term-total"
-                  type="number"
-                  value={termTotal}
-                  onChange={(e) => setTermTotal(parseIntOrZero(e.target.value))}
-                />
-              </div>
-
-              {/* Current Attendance % */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="term-attendance">
-                    Current Attendance %
+                  <Label htmlFor="termAttendance">
+                    Current Term Attendance %
                   </Label>
                   <Tooltip>
                     <TooltipTrigger>
                       <HelpCircle className="h-4 w-4" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Your app/portal’s attendance for the entire term.</p>
+                      <p>
+                        Enter the overall term attendance % from your portal.
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
                 <Input
-                  id="term-attendance"
+                  id="termAttendance"
                   type="number"
                   step={0.01}
                   value={termAttendancePct.toFixed(2)}
                   onChange={(e) =>
-                    setTermAttendancePct(parseFloatClamped(e.target.value, 0, 100))
+                    setTermAttendancePct(
+                      parseFloatClamped(e.target.value, 0, 100)
+                    )
                   }
                 />
               </div>
-            </div>
 
-            <TermCardDisplay
-              monthsPassed={termMonthsPassed}
-              weeksPassed={termWeeksPassed}
-              daysPassed={termDaysPassed}
-              attended={termAttended}
-              missed={termMissed}
-              attendancePct={termAttendancePct}
-              requiredAttendance={requiredAttendance}
-            />
+              <DisplayAttendance
+                periodLabel="Term"
+                total={termTotal}
+                attendancePct={termAttendancePct}
+                requiredAttendance={requiredAttendance}
+              />
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -680,198 +473,56 @@ export default function AttendanceCalculator() {
   )
 }
 
-/* --- DAY DISPLAY --- */
-function DayCardDisplay({
-  dayMissed,
-  dayPerc,
-  requiredAttendance,
-}: {
-  dayMissed: number
-  dayPerc: number
-  requiredAttendance: number
-}) {
-  const belowReq = dayPerc < requiredAttendance
-  const color = belowReq ? "bg-red-500" : "bg-green-500"
-  const width = `${Math.min(dayPerc, 100).toFixed(2)}%`
-
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={`day-att-${dayPerc}`}
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        transition={{ duration: 0.2 }}
-      >
-        <Alert className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <InfoIcon className="h-4 w-4" />
-            <AlertDescription>
-              Day Attendance: {dayPerc.toFixed(2)}% | Missed: {dayMissed}
-            </AlertDescription>
-          </div>
-          {/* Progress bar */}
-          <div className="w-full h-3 bg-gray-300 rounded">
-            <motion.div
-              className={`h-full rounded ${color}`}
-              initial={{ width: 0 }}
-              animate={{ width }}
-              transition={{ duration: 0.5 }}
-            />
-          </div>
-        </Alert>
-      </motion.div>
-    </AnimatePresence>
-  )
-}
-
-/* --- WEEK DISPLAY --- */
-function WeekCardDisplay({
-  attended,
-  missed,
+/**
+ * Displays the calculated "Attended" and "Missed" from the given total & attendancePct,
+ * plus a color-coded progress bar based on the user’s requiredAttendance.
+ */
+function DisplayAttendance({
+  periodLabel,
+  total,
   attendancePct,
   requiredAttendance,
 }: {
-  attended: number
-  missed: number
+  periodLabel: string
+  total: number
   attendancePct: number
   requiredAttendance: number
 }) {
+  // compute actual attended & missed
+  const attended = Math.round((attendancePct / 100) * total)
+  const missed = total - attended
+
   const belowReq = attendancePct < requiredAttendance
-  const color = belowReq ? "bg-red-500" : "bg-green-500"
-  const width = `${Math.min(attendancePct, 100).toFixed(2)}%`
+  const barColor = belowReq ? "bg-red-500" : "bg-green-500"
+  const barWidth = `${Math.min(attendancePct, 100).toFixed(2)}%`
 
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key={`week-att-${attendancePct}`}
+        key={`${periodLabel}-${attendancePct}`}
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
         transition={{ duration: 0.2 }}
+        className="space-y-2"
       >
         <Alert className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <InfoIcon className="h-4 w-4" />
             <AlertDescription>
-              Week Attendance: {attendancePct.toFixed(2)}% | Attended: {attended} | Missed: {missed}
-            </AlertDescription>
-          </div>
-          {/* Progress */}
-          <div className="w-full h-3 bg-gray-300 rounded">
-            <motion.div
-              className={`h-full rounded ${color}`}
-              initial={{ width: 0 }}
-              animate={{ width }}
-              transition={{ duration: 0.5 }}
-            />
-          </div>
-        </Alert>
-      </motion.div>
-    </AnimatePresence>
-  )
-}
-
-/* --- MONTH DISPLAY --- */
-function MonthCardDisplay({
-  attended,
-  missed,
-  attendancePct,
-  requiredAttendance,
-}: {
-  attended: number
-  missed: number
-  attendancePct: number
-  requiredAttendance: number
-}) {
-  const belowReq = attendancePct < requiredAttendance
-  const color = belowReq ? "bg-red-500" : "bg-green-500"
-  const width = `${Math.min(attendancePct, 100).toFixed(2)}%`
-
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={`month-att-${attendancePct}`}
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        transition={{ duration: 0.2 }}
-      >
-        <Alert className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <InfoIcon className="h-4 w-4" />
-            <AlertDescription>
-              Monthly Attendance: {attendancePct.toFixed(2)}% | Attended: {attended} | Missed: {missed}
-            </AlertDescription>
-          </div>
-          {/* Progress */}
-          <div className="w-full h-3 bg-gray-300 rounded">
-            <motion.div
-              className={`h-full rounded ${color}`}
-              initial={{ width: 0 }}
-              animate={{ width }}
-              transition={{ duration: 0.5 }}
-            />
-          </div>
-        </Alert>
-      </motion.div>
-    </AnimatePresence>
-  )
-}
-
-/* --- TERM DISPLAY --- */
-function TermCardDisplay({
-  monthsPassed,
-  weeksPassed,
-  daysPassed,
-  attended,
-  missed,
-  attendancePct,
-  requiredAttendance,
-}: {
-  monthsPassed: number
-  weeksPassed: number
-  daysPassed: number
-  attended: number
-  missed: number
-  attendancePct: number
-  requiredAttendance: number
-}) {
-  const belowReq = attendancePct < requiredAttendance
-  const color = belowReq ? "bg-red-500" : "bg-green-500"
-  const width = `${Math.min(attendancePct, 100).toFixed(2)}%`
-
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={`term-att-${attendancePct}`}
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        transition={{ duration: 0.2 }}
-      >
-        <Alert className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <InfoIcon className="h-4 w-4" />
-            <AlertDescription>
-              Term Attendance: {attendancePct.toFixed(2)}% | Attended: {attended} | Missed: {missed}
+              {periodLabel} Attendance: {attendancePct.toFixed(2)}%  
+              {"  "}| Attended: {attended} | Missed: {missed}
             </AlertDescription>
           </div>
           <div className="w-full h-3 bg-gray-300 rounded">
             <motion.div
-              className={`h-full rounded ${color}`}
+              className={`h-full rounded ${barColor}`}
               initial={{ width: 0 }}
-              animate={{ width }}
+              animate={{ width: barWidth }}
               transition={{ duration: 0.5 }}
             />
           </div>
         </Alert>
-
-        <div className="mt-2 text-sm text-gray-600 space-y-1">
-          <p>Months passed: {monthsPassed}</p>
-          <p>Weeks passed: {weeksPassed}</p>
-          <p>Days passed: {daysPassed}</p>
-        </div>
       </motion.div>
     </AnimatePresence>
   )
