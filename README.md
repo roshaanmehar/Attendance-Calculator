@@ -114,7 +114,6 @@ cd attendance-calculator</code></pre>
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210832.png" width="500">
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210855.png" width="500">
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20190107.png" width="500">
-
     <h3>Past Versions</h3>
     <p>This is version 1</p>
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v1.png" width="500">
