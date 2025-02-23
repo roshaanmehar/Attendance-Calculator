@@ -138,7 +138,6 @@ cd attendance-calculator</code></pre>
     <p>This is version 11</p>
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v11.png" width="500">
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v11%20(2).png" width="500">
-  
     <h2 id="future-improvements">Future Improvements</h2>
     <ul>
       <li><strong>Enhanced Input Validation:</strong> Improve validation and error handling for edge cases.</li>
