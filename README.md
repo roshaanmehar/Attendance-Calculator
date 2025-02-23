@@ -114,6 +114,39 @@ cd attendance-calculator</code></pre>
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210832.png" width="500">
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20210855.png" width="500">
     <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/Screenshot%202025-02-22%20190107.png" width="500">
+
+    <h3>Past Versions</h3>
+    <p>This is version 1</p>
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v1.png" width="500">
+    <p>This is version 3</p>
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v3.png" width="500">
+    <p>This is version 4</p>
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v4.png" width="500">
+    <p>This is version 5</p>
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v5.png" width="500">
+    <p>This is version 6</p>
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v6.png" width="500">
+    <p>This is version 7</p>
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v7.png" width="500">
+    <p>This is version 8</p>
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v8.png" width="500">
+    <p>This is version 9</p>
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v9.png" width="500">
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v9%20(2).png" width="500">
+    <p>This is version 10</p>
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v10.png" width="500">
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v10%20(2).png" width="500">
+    <p>This is version 11</p>
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v11.png" width="500">
+    <img src="https://github.com/roshaanmehar/Attendance-Calculator/blob/main/v11%20(2).png" width="500">
+    <p>This is version</p>
+    <p>This is version</p>
+    <p>This is version</p>
+    <p>This is version</p>
+    <p>This is version</p>
+    <p>This is version</p>
+    <img src="" width="500">
+    <img src="" width="500">
     <h2 id="future-improvements">Future Improvements</h2>
     <ul>
       <li><strong>Enhanced Input Validation:</strong> Improve validation and error handling for edge cases.</li>
